@@ -1,0 +1,49 @@
+name: Deploy derby to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-derby
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy-derby:
+    runs-on: ubuntu-latest
+    environment:
+      name: derby
+      url: https://KMRa7.github.io/derby-clockin/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build derby
+        run: npm run build:derby
+        env:
+          VITE_APP: derby
+          VITE_SUPABASE_URL: ${{ secrets.DERBY_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.DERBY_SUPABASE_ANON_KEY }}
+
+      - name: Deploy to derby repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
+          external_repository: KMRa7/derby-clockin
+          publish_branch: gh-pages
+          publish_dir: dist/derby
