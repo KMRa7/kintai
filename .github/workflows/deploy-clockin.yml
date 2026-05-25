@@ -1,0 +1,49 @@
+name: Deploy clockin to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-clockin
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy-clockin:
+    runs-on: ubuntu-latest
+    environment:
+      name: clockin
+      url: https://KMRa7.github.io/clockin/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build clockin
+        run: npm run build:clockin
+        env:
+          VITE_APP: clockin
+          VITE_SUPABASE_URL: ${{ secrets.CLOCKIN_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.CLOCKIN_SUPABASE_ANON_KEY }}
+
+      - name: Deploy to clockin repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
+          external_repository: KMRa7/clockin
+          publish_branch: gh-pages
+          publish_dir: dist/clockin
