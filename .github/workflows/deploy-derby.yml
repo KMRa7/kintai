@@ -40,10 +40,14 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.DERBY_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.DERBY_SUPABASE_ANON_KEY }}
 
-      - name: Deploy to derby repo
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          personal_token: ${{ secrets.DEPLOY_TOKEN }}
-          external_repository: KMRa7/derby-clockin
-          publish_branch: gh-pages
-          publish_dir: dist/derby
+          path: dist/derby
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
