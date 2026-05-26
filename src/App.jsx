@@ -17,9 +17,22 @@ const TIME_SLOTS = [
 const DAYS_JP = ["月","火","水","木","金","土","日"];
 const STORE_LAT = CONFIG.storeLat, STORE_LNG = CONFIG.storeLng, STORE_RADIUS_M = CONFIG.storeRadiusM;
 const C = {
-  bg:"#fdf6ee", paper:"#fffaf3", ink:"#2d1a0e", muted:"#8b6f5a",
-  accent:"#c0392b", gold:"#d4a843", green:"#2d7a4f", border:"#e8d5bc",
-  shadow:"0 2px 12px rgba(45,26,14,0.09)",
+  bg: CONFIG.theme.bg,
+  paper: CONFIG.theme.paper,
+  surface2: CONFIG.theme.surface2,
+  ink: CONFIG.theme.ink,
+  muted: CONFIG.theme.muted,
+  accent: CONFIG.theme.accent,
+  gold: CONFIG.theme.gold,
+  gold2: CONFIG.theme.gold2,
+  green: CONFIG.theme.green,
+  greenBg: CONFIG.theme.greenBg,
+  greenBorder: CONFIG.theme.greenBorder,
+  border: CONFIG.theme.border,
+  border2: CONFIG.theme.border2,
+  shadow: CONFIG.theme.shadow,
+  blue: CONFIG.theme.blue,
+  blueBg: CONFIG.theme.blueBg,
 };
 
 function getWeekDates(offset=0){
@@ -193,7 +206,7 @@ export default function App(){
   return (
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif",color:C.ink}}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
-      <header style={{background:C.ink,color:"#fffaf3",padding:"14px 18px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
+      <header style={{background:C.paper,color:C.ink,padding:"14px 18px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:22}}>{CONFIG.emoji}</span>
           <div>
@@ -203,10 +216,10 @@ export default function App(){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:16,fontWeight:700,fontVariantNumeric:"tabular-nums",color:C.gold}}>{fmtHMS(now)}</div>
+            <div style={{fontSize:16,fontWeight:700,fontVariantNumeric:"tabular-nums",color:C.gold,letterSpacing:"0.05em"}}>{fmtHMS(now)}</div>
             {!isAdmin&&<div style={{fontSize:10,color:"#c8b49a"}}>{currentUser?.name}</div>}
           </div>
-          <button onClick={handleLogout} style={{padding:"6px 12px",borderRadius:16,border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.1)",color:"#fffaf3",fontFamily:"inherit",fontSize:11,fontWeight:700,cursor:"pointer"}}>🔒 ログアウト</button>
+          <button onClick={handleLogout} style={{padding:"6px 12px",borderRadius:16,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:11,fontWeight:700,cursor:"pointer"}}>🔒 ログアウト</button>
         </div>
       </header>
 
@@ -251,7 +264,7 @@ function LoginPage({onSuccess,staff}){
   }
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif"}}>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,minHeight:"100vh",fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
       <div style={{marginBottom:28,textAlign:"center"}}>
         <div style={{fontSize:42,marginBottom:8}}>{CONFIG.emoji}</div>
@@ -292,7 +305,7 @@ function UserLayout({tab,setTab,currentUser,now,getAtt,punchIn,punchOut,getShift
   const tabStyle=(active)=>({flex:1,padding:"11px 4px 9px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`3px solid ${C.accent}`:"3px solid transparent",color:active?C.accent:C.muted,fontFamily:"inherit",fontSize:11,fontWeight:active?700:400});
   return (
     <>
-      <nav style={{display:"flex",background:"#f5e9d6",borderBottom:`2px solid ${C.border}`}}>
+      <nav style={{display:"flex",background:C.surface2,borderBottom:`2px solid ${C.border}`}}>
         <button onClick={()=>setTab("punch")} style={tabStyle(tab==="punch")}><div style={{fontSize:16}}>⏱</div>打刻</button>
         <button onClick={()=>setTab("record")} style={tabStyle(tab==="record")}><div style={{fontSize:16}}>📊</div>勤務実績</button>
       </nav>
@@ -316,7 +329,7 @@ function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,atte
   const tabStyle=(active)=>({flex:1,padding:"10px 2px 8px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`3px solid ${C.accent}`:"3px solid transparent",color:active?C.accent:C.muted,fontFamily:"inherit",fontSize:10,fontWeight:active?700:400});
   return (
     <>
-      <nav style={{display:"flex",background:"#f5e9d6",borderBottom:`2px solid ${C.border}`,overflowX:"auto"}}>
+      <nav style={{display:"flex",background:C.surface2,borderBottom:`2px solid ${C.border}`,overflowX:"auto"}}>
         {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabStyle(tab===t.id)}><div style={{fontSize:14}}>{t.icon}</div>{t.label}</button>)}
       </nav>
       <main style={{maxWidth:900,margin:"0 auto",padding:"18px 14px 60px"}}>
@@ -344,14 +357,14 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
     if(!sh&&!att?.clock_in) return {label:"休日",bg:"#f1f5f9",color:"#94a3b8"};
     if(!sh&& att?.clock_in) return {label:"シフト外",bg:"#e0f2fe",color:"#075985"};
     if( sh&&!att?.clock_in) return {label:"欠勤",bg:"#fee2e2",color:"#991b1b"};
-    if(!att?.clock_out)     return {label:"勤務中",bg:"#d1fae5",color:"#065f46"};
+    if(!att?.clock_out)     return {label:"勤務中",bg:C.greenBg,color:"#065f46"};
     const aIn=new Date(att.clock_in),aOut=new Date(att.clock_out);
     const aInM=aIn.getHours()*60+aIn.getMinutes(),aOutM=aOut.getHours()*60+aOut.getMinutes();
     const late=aInM>toMin(sh.start_time)+5,early=aOutM<toMin(sh.end_time)-5;
     if(late&&early) return {label:"遅刻・早退",bg:"#fee2e2",color:"#991b1b"};
     if(late)        return {label:"遅刻",bg:"#fef3c7",color:"#92400e"};
     if(early)       return {label:"早退",bg:"#ede9fe",color:"#5b21b6"};
-    return              {label:"正常",bg:"#d1fae5",color:"#065f46"};
+    return              {label:"正常",bg:C.greenBg,color:"#065f46"};
   }
 
   const monthTotal=monthDates.reduce((acc,d)=>{
@@ -374,7 +387,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
-          <thead><tr style={{background:C.ink,color:"#fffaf3"}}>
+          <thead><tr style={{background:C.surface2,color:C.muted}}>
             {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
           <tbody>
@@ -387,7 +400,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
                   <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
                   <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:"#cbd5e1",whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:"#2563eb"}}>{fmtHM(att.clock_in)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
+                  <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:C.blue}}>{fmtHM(att.clock_in)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
                   <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_out?<span style={{color:"#7c3aed"}}>{fmtHM(att.clock_out)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",fontWeight:700,color:mins>0?C.ink:"#cbd5e1"}}>{mins>0?`${Math.floor(mins/60)}h${mins%60}m`:"──"}</td>
                   <td style={{padding:"7px 6px",textAlign:"center"}}><span style={{fontSize:10,padding:"2px 6px",borderRadius:8,background:vd.bg,color:vd.color,fontWeight:700,whiteSpace:"nowrap"}}>{vd.label}</span></td>
@@ -395,7 +408,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
               );
             })}
           </tbody>
-          <tfoot><tr style={{background:C.ink,color:"#fffaf3"}}>
+          <tfoot><tr style={{background:C.surface2,color:C.muted}}>
             <td colSpan={5} style={{padding:"10px 12px",fontWeight:700,fontSize:12}}>月合計</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>¥{monthTotal.pay.toLocaleString()}</td>
@@ -435,7 +448,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
       <WeekNav dates={dates} offset={weekOffset} setOffset={setWeekOffset}/>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:560}}>
-          <thead><tr style={{background:C.ink,color:"#fffaf3"}}>
+          <thead><tr style={{background:C.surface2,color:C.muted}}>
             <th style={{padding:"10px 12px",textAlign:"left",width:88}}>スタッフ</th>
             {dates.map((d,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",color:i>=5?C.gold:"#fffaf3",minWidth:70}}><div>{DAYS_JP[i]}</div><div style={{fontSize:10,opacity:0.7}}>{fmtDate(d)}</div></th>)}
           </tr></thead>
@@ -451,7 +464,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
                   return (
                     <td key={dayIdx} style={{padding:"5px 4px",textAlign:"center"}}>
                       {sh?(
-                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"5px 2px",borderRadius:8,border:"1px solid #a7f3d0",background:"#d1fae5",color:"#065f46",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",lineHeight:1.5}}>
+                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"5px 2px",borderRadius:8,border:"1px solid #a7f3d0",background:C.greenBg,color:"#065f46",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",lineHeight:1.5}}>
                           {sh.start_time}<br/>〜{sh.end_time}
                         </button>
                       ):(
@@ -517,8 +530,8 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
   }
 
   const SL={absent:"未出勤",working:"勤務中",done:"退勤済"};
-  const SC={absent:C.muted,working:C.green,done:"#6366f1"};
-  const SB={absent:"#f1f5f9",working:"#d1fae5",done:"#e0e7ff"};
+  const SC={absent:C.muted,working:C.green,done:C.blue};
+  const SB={absent:"#f1f5f9",working:C.greenBg,done:C.blueBg};
 
   return (
     <div>
@@ -555,10 +568,10 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
               </div>
             ))}
           </div>
-          {gps!=="idle"&&<div style={{marginBottom:14,padding:"9px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:gps==="ok"?"#d1fae5":gps==="checking"?"#fef9ec":"#fee2e2",color:gps==="ok"?"#065f46":gps==="checking"?"#92400e":"#991b1b",display:"flex",alignItems:"center",gap:8}}><span>{gps==="checking"?"📡":gps==="ok"?"📍":"🚫"}</span>{gpsMsg}</div>}
+          {gps!=="idle"&&<div style={{marginBottom:14,padding:"9px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:gps==="ok"?C.greenBg:gps==="checking"?"#fef9ec":"#fee2e2",color:gps==="ok"?"#065f46":gps==="checking"?"#92400e":"#991b1b",display:"flex",alignItems:"center",gap:8}}><span>{gps==="checking"?"📡":gps==="ok"?"📍":"🚫"}</span>{gpsMsg}</div>}
           <div style={{display:"flex",gap:10}}>
             <button disabled={!!att?.clock_in||gps==="checking"||punching} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:!att?.clock_in&&gps!=="checking"&&!punching?C.green:"#e2e8f0",color:!att?.clock_in&&gps!=="checking"&&!punching?"#fff":"#94a3b8",fontSize:13,fontWeight:700,cursor:!att?.clock_in&&gps!=="checking"&&!punching?"pointer":"not-allowed",fontFamily:"inherit"}}>🟢 出勤打刻</button>
-            <button disabled={!att?.clock_in||!!att?.clock_out||gps==="checking"||punching} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"#6366f1":"#e2e8f0",color:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"#fff":"#94a3b8",fontSize:13,fontWeight:700,cursor:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"pointer":"not-allowed",fontFamily:"inherit"}}>🔵 退勤打刻</button>
+            <button disabled={!att?.clock_in||!!att?.clock_out||gps==="checking"||punching} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?C.blue:"#e2e8f0",color:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"#fff":"#94a3b8",fontSize:13,fontWeight:700,cursor:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"pointer":"not-allowed",fontFamily:"inherit"}}>🔵 退勤打刻</button>
           </div>
           {singleUser&&<div style={{marginTop:8,textAlign:"center",fontSize:11,color:C.muted}}>🔒 {CONFIG.storeAddress}から{STORE_RADIUS_M}m以内の位置情報が必要です</div>}
           {!singleUser&&<div style={{marginTop:8,textAlign:"center",fontSize:11,color:C.gold}}>⚡ 管理者モード：位置情報チェックなし</div>}
@@ -571,8 +584,8 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
             {staff.map((s,i)=>{
               const a=getAtt(s.id,today),st=!a?.clock_in?"absent":!a?.clock_out?"working":"done";
               const SL2={absent:"未出勤",working:"勤務中",done:"退勤済"};
-              const SC2={absent:C.muted,working:C.green,done:"#6366f1"};
-              const SB2={absent:"#f1f5f9",working:"#d1fae5",done:"#e0e7ff"};
+              const SC2={absent:C.muted,working:C.green,done:C.blue};
+              const SB2={absent:"#f1f5f9",working:C.greenBg,done:C.blueBg};
               return (
                 <div key={s.id} style={{display:"flex",alignItems:"center",padding:"10px 14px",gap:10,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none"}}>
                   <div style={{width:30,height:30,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{nameToAvatar(s.name)}</div>
@@ -606,14 +619,14 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
     if(!sh&&!att?.clock_in) return {label:"休日",bg:"#f1f5f9",color:"#94a3b8"};
     if(!sh&& att?.clock_in) return {label:"シフト外",bg:"#e0f2fe",color:"#075985"};
     if( sh&&!att?.clock_in) return {label:"欠勤",bg:"#fee2e2",color:"#991b1b"};
-    if(!att?.clock_out)     return {label:"勤務中",bg:"#d1fae5",color:"#065f46"};
+    if(!att?.clock_out)     return {label:"勤務中",bg:C.greenBg,color:"#065f46"};
     const aIn=new Date(att.clock_in),aOut=new Date(att.clock_out);
     const aInM=aIn.getHours()*60+aIn.getMinutes(),aOutM=aOut.getHours()*60+aOut.getMinutes();
     const late=aInM>toMin(sh.start_time)+5,early=aOutM<toMin(sh.end_time)-5;
     if(late&&early) return {label:"遅刻・早退",bg:"#fee2e2",color:"#991b1b"};
     if(late)        return {label:"遅刻",bg:"#fef3c7",color:"#92400e"};
     if(early)       return {label:"早退",bg:"#ede9fe",color:"#5b21b6"};
-    return              {label:"正常",bg:"#d1fae5",color:"#065f46"};
+    return              {label:"正常",bg:C.greenBg,color:"#065f46"};
   }
 
   const monthTotal=selStaff?monthDates.reduce((acc,d)=>{
@@ -640,7 +653,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
-          <thead><tr style={{background:C.ink,color:"#fffaf3"}}>
+          <thead><tr style={{background:C.surface2,color:C.muted}}>
             {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
           <tbody>
@@ -653,7 +666,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
                   <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
                   <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:"#cbd5e1",whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:"#2563eb"}}>{fmtHM(att.clock_in)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
+                  <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:C.blue}}>{fmtHM(att.clock_in)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
                   <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_out?<span style={{color:"#7c3aed"}}>{fmtHM(att.clock_out)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",fontWeight:700,color:mins>0?C.ink:"#cbd5e1"}}>{mins>0?`${Math.floor(mins/60)}h${mins%60}m`:"──"}</td>
                   <td style={{padding:"7px 6px",textAlign:"center"}}><span style={{fontSize:10,padding:"2px 6px",borderRadius:8,background:vd.bg,color:vd.color,fontWeight:700,whiteSpace:"nowrap"}}>{vd.label}</span></td>
@@ -661,7 +674,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
               );
             })}
           </tbody>
-          <tfoot><tr style={{background:C.ink,color:"#fffaf3"}}>
+          <tfoot><tr style={{background:C.surface2,color:C.muted}}>
             <td colSpan={5} style={{padding:"10px 12px",fontWeight:700,fontSize:12}}>月合計</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>¥{monthTotal.pay.toLocaleString()}</td>
@@ -717,7 +730,7 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
         {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${selStaff.id===s.id?C.ink:C.border}`,background:selStaff.id===s.id?C.ink:C.paper,color:selStaff.id===s.id?"#fffaf3":C.ink,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600}}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
       <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
-        <div style={{background:"#f5e9d6",padding:"9px 14px",display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
+        <div style={{background:C.surface2,padding:"9px 14px",display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
           <span>日付</span><span>曜</span><span>シフト</span><span>出勤</span><span>退勤</span><span style={{textAlign:"center"}}>修正</span>
         </div>
         {monthDates.map((d,i)=>{
@@ -729,7 +742,7 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
               <span style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?C.gold:C.ink}}>{month+1}/{d.getDate()}{isToday?" ✦":""}</span>
               <span style={{fontSize:12,color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</span>
               <span style={{fontSize:11,color:sh?C.green:"#cbd5e1"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</span>
-              <span style={{fontSize:12,color:att?.clock_in?"#2563eb":"#cbd5e1",fontWeight:att?.clock_in?600:400}}>{att?.clock_in?fmtHM(att.clock_in):"──"}</span>
+              <span style={{fontSize:12,color:att?.clock_in?C.blue:"#cbd5e1",fontWeight:att?.clock_in?600:400}}>{att?.clock_in?fmtHM(att.clock_in):"──"}</span>
               <span style={{fontSize:12,color:att?.clock_out?"#7c3aed":"#cbd5e1",fontWeight:att?.clock_out?600:400}}>{att?.clock_out?fmtHM(att.clock_out):"──"}</span>
               <button onClick={()=>openEdit(d)} style={{padding:"4px 8px",borderRadius:8,border:`1px solid ${C.border}`,background:hasRecord?"#fef9ec":C.bg,color:C.ink,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
                 {hasRecord?"✏️ 編集":"➕ 追加"}
@@ -778,7 +791,7 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
     <div>
       <SectionTitle icon="💴" title="時給・給与設定" sub="スタッフごとの時給と今月の給与を確認できます"/>
       <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
-        <div style={{background:"#f5e9d6",padding:"9px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
+        <div style={{background:C.surface2,padding:"9px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
           <span>スタッフ</span><span style={{textAlign:"right"}}>時給</span><span style={{textAlign:"center"}}>今月実働</span><span style={{textAlign:"right"}}>今月給与</span><span style={{textAlign:"center"}}>変更</span>
         </div>
         {staff.map((s,i)=>{
@@ -885,7 +898,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
         </button>
       )}
       <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
-        <div style={{background:"#f5e9d6",padding:"9px 16px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center"}}>
+        <div style={{background:C.surface2,padding:"9px 16px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center"}}>
           <span>スタッフ</span><span>ユーザー名</span><span style={{textAlign:"right"}}>時給</span><span style={{textAlign:"center"}}>操作</span>
         </div>
         {staff.map((s,i)=>(
