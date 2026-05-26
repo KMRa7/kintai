@@ -8,6 +8,24 @@ const config = {
   storeLng: 135.7780,
   storeRadiusM: 150,
   storeAddress: "東山区日吉町",
+  theme: {
+    bg: "#fdf6ee",
+    paper: "#fffaf3",
+    surface2: "#f5e9d6",
+    ink: "#2d1a0e",
+    muted: "#8b6f5a",
+    accent: "#c0392b",
+    gold: "#d4a843",
+    gold2: "#e8c97a",
+    green: "#2d7a4f",
+    greenBg: "#d1fae5",
+    greenBorder: "#a7f3d0",
+    border: "#e8d5bc",
+    border2: "#e8d5bc",
+    shadow: "0 2px 12px rgba(45,26,14,0.09)",
+    blue: "#2563eb",
+    blueBg: "#e0e7ff",
+  },
 };
 
 export default config;
