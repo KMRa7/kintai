@@ -289,7 +289,7 @@ function LoginPage({onSuccess,staff}){
           <input type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}}
             onKeyDown={e=>e.key==="Enter"&&document.getElementById("pw-input").focus()}
             placeholder="例: tanaka / admin" disabled={locked}
-            style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold}}/>
+            style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
         </div>
         <div style={{marginBottom:20}}>
           <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5}}>パスワード</label>
@@ -298,7 +298,7 @@ function LoginPage({onSuccess,staff}){
               onChange={e=>{setPassword(e.target.value);setError("");}}
               onKeyDown={e=>e.key==="Enter"&&handleLogin()}
               placeholder="パスワード" disabled={locked}
-              style={{width:"100%",padding:"11px 40px 11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold}}/>
+              style={{width:"100%",padding:"11px 40px 11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
             <button onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted}}>{showPw?"🙈":"👁"}</button>
           </div>
         </div>
@@ -880,7 +880,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
         <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:4}}>{placeholder}</label>
         <input type={type} value={form[key]} placeholder={placeholder}
           onChange={e=>setForm(p=>({...p,[key]:e.target.value}))}
-          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${errors[key]?C.accent:C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box"}}/>
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${errors[key]?C.accent:C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
         {errors[key]&&<div style={{fontSize:11,color:C.accent,marginTop:3}}>⚠ {errors[key]}</div>}
       </div>
     );
@@ -970,4 +970,8 @@ function Modal({children,onClose}){
 const NB={padding:"6px 14px",background:"transparent",border:`1px solid #e8d5bc`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,color:"#8b6f5a"};
 const LS={display:"flex",flexDirection:"column",gap:5,fontSize:12,color:"#8b6f5a",flex:1};
 const SS={padding:"8px 10px",borderRadius:8,border:`1px solid #e8d5bc`,fontFamily:"inherit",fontSize:13,background:"#fdf6ee",color:"#2d1a0e"};
-const PB=bg=>({width:"100%",padding:"12px",background:bg,color:bg==="#fffaf3"||bg==="#fdf6ee"||bg==="#fee2e2"?"#2d1a0e":"#fffaf3",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"block"});
+const PB=bg=>{
+  const lightBgs=["#fffaf3","#fdf6ee","#fee2e2",C.gold,C.gold2];
+  const isDark=bg===C.ink||bg===C.accent;
+  return {width:"100%",padding:"12px",background:bg,color:lightBgs.includes(bg)?"#0a0a0a":isDark?"#fffaf3":"#fffaf3",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"block"};
+};
