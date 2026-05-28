@@ -193,7 +193,10 @@ export default function App(){
   if(loading && staff.length===0){
     return (
       <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
-        <div style={{fontSize:36}}>{CONFIG.emoji}</div>
+        {CONFIG.logoBase64
+          ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:48,height:48,objectFit:"contain"}}/>
+          : <div style={{fontSize:36}}>{CONFIG.emoji}</div>
+        }
         <div style={{fontSize:14,color:C.muted}}>読み込み中...</div>
       </div>
     );
@@ -208,7 +211,10 @@ export default function App(){
       <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
       <header style={{background:C.paper,color:C.ink,padding:"14px 18px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:22}}>{CONFIG.emoji}</span>
+          {CONFIG.logoBase64
+            ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:36,height:36,objectFit:"contain",borderRadius:6}}/>
+            : <span style={{fontSize:22}}>{CONFIG.emoji}</span>
+          }
           <div>
             <div style={{fontSize:14,fontWeight:700,letterSpacing:"0.08em"}}>勤怠管理システム</div>
             <div style={{fontSize:10,color:C.gold,letterSpacing:"0.12em"}}>{isAdmin?"管理者モード":CONFIG.brandName}</div>
@@ -267,7 +273,12 @@ function LoginPage({onSuccess,staff}){
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,minHeight:"100vh",fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
       <div style={{marginBottom:28,textAlign:"center"}}>
-        <div style={{fontSize:42,marginBottom:8}}>{CONFIG.emoji}</div>
+        {CONFIG.logoWideBase64
+          ? <img src={CONFIG.logoWideBase64} alt={CONFIG.brandName} style={{maxWidth:200,height:"auto",objectFit:"contain",marginBottom:12}}/>
+          : CONFIG.logoBase64
+            ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:64,height:64,objectFit:"contain",marginBottom:8}}/>
+            : <div style={{fontSize:42,marginBottom:8}}>{CONFIG.emoji}</div>
+        }
         <div style={{fontSize:20,fontWeight:700,color:C.ink,letterSpacing:"0.08em"}}>勤怠管理システム</div>
         <div style={{fontSize:11,color:C.gold,letterSpacing:"0.14em",marginTop:3}}>CONFIG.brandName</div>
       </div>
