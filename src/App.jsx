@@ -280,7 +280,7 @@ function LoginPage({onSuccess,staff}){
             : <div style={{fontSize:42,marginBottom:8}}>{CONFIG.emoji}</div>
         }
         <div style={{fontSize:20,fontWeight:700,color:C.ink,letterSpacing:"0.08em"}}>勤怠管理システム</div>
-        <div style={{fontSize:11,color:C.gold,letterSpacing:"0.14em",marginTop:3}}>CONFIG.brandName</div>
+        <div style={{fontSize:11,color:C.gold,letterSpacing:"0.14em",marginTop:3}}>{CONFIG.brandName}</div>
       </div>
       <div style={{background:C.paper,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:360,boxShadow:"0 8px 32px rgba(45,26,14,0.12)"}}>
         <div style={{fontSize:15,fontWeight:700,marginBottom:20}}>ログイン</div>
@@ -289,7 +289,7 @@ function LoginPage({onSuccess,staff}){
           <input type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}}
             onKeyDown={e=>e.key==="Enter"&&document.getElementById("pw-input").focus()}
             placeholder="例: tanaka / admin" disabled={locked}
-            style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box"}}/>
+            style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold}}/>
         </div>
         <div style={{marginBottom:20}}>
           <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5}}>パスワード</label>
@@ -298,13 +298,13 @@ function LoginPage({onSuccess,staff}){
               onChange={e=>{setPassword(e.target.value);setError("");}}
               onKeyDown={e=>e.key==="Enter"&&handleLogin()}
               placeholder="パスワード" disabled={locked}
-              style={{width:"100%",padding:"11px 40px 11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box"}}/>
+              style={{width:"100%",padding:"11px 40px 11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold}}/>
             <button onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted}}>{showPw?"🙈":"👁"}</button>
           </div>
         </div>
         {error&&<div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:14,padding:"8px 12px",background:"#fee2e2",borderRadius:8}}>{locked?"🚫 ":"❌ "}{error}</div>}
         <button onClick={handleLogin} disabled={!username||!password||locked}
-          style={{width:"100%",padding:13,borderRadius:10,border:"none",background:!username||!password||locked?"#e2e8f0":C.ink,color:!username||!password||locked?"#94a3b8":"#fffaf3",fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer"}}>
+          style={{width:"100%",padding:13,borderRadius:10,border:"none",background:!username||!password||locked?"#1a1a1a":C.gold,color:!username||!password||locked?"#444":"#0a0a0a",fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer"}}>
           ログイン
         </button>
       </div>
