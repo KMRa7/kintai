@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -17,9 +17,6 @@ concurrency:
 jobs:
   build-and-deploy-derby:
     runs-on: ubuntu-latest
-    environment:
-      name: derby
-      url: https://KMRa7.github.io/derby-clockin/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,14 +37,10 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.DERBY_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.DERBY_SUPABASE_ANON_KEY }}
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to derby-clockin repo
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: dist/derby
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
+          external_repository: KMRa7/derby-clockin
+          publish_branch: gh-pages
+          publish_dir: dist/derby
