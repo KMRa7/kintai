@@ -467,7 +467,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
             {staff.map((s,si)=>(
               <tr key={s.id} style={{borderBottom:`1px solid ${C.border}`,background:si%2===0?"#111":"#0d0d0d"}}>
                 <td style={{padding:"10px",fontWeight:700}}>
-                  <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:"50%",background:"#e8d5bc",color:C.muted,fontSize:11,fontWeight:700,marginRight:5}}>{nameToAvatar(s.name)}</span>
+                  <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:"50%",background:"#1e1e1e",color:"#666",fontSize:11,fontWeight:700,marginRight:5}}>{nameToAvatar(s.name)}</span>
                   {s.name.split(" ")[0]}
                 </td>
                 {dates.map((_,dayIdx)=>{
@@ -553,7 +553,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
             const a=getAtt(s.id,today),st=!a?.clock_in?"absent":!a?.clock_out?"working":"done",isSel=selected?.id===s.id;
             return (
               <button key={s.id} onClick={()=>{setSelected(s);setGps("idle");setGpsMsg("");}} style={{background:isSel?C.ink:C.paper,border:`2px solid ${isSel?C.ink:C.border}`,borderRadius:14,padding:"12px 8px",cursor:"pointer",textAlign:"center",boxShadow:C.shadow}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:isSel?C.gold:"#e8d5bc",color:isSel?C.ink:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,margin:"0 auto 7px"}}>{nameToAvatar(s.name)}</div>
+                <div style={{width:40,height:40,borderRadius:"50%",background:isSel?C.gold:"#1e1e1e",color:isSel?"#0a0a0a":"#666",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,margin:"0 auto 7px"}}>{nameToAvatar(s.name)}</div>
                 <div style={{fontSize:12,fontWeight:700,color:isSel?"#fffaf3":C.ink,marginBottom:5}}>{s.name.split(" ")[0]}</div>
                 <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:SB[st],color:SC[st],fontWeight:700}}>{SL[st]}</span>
               </button>
@@ -564,7 +564,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
       {selected&&(
         <div style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-            <div style={{width:46,height:46,borderRadius:"50%",background:C.ink,color:C.gold,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700}}>{nameToAvatar(selected.name)}</div>
+            <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${C.gold},${C.gold2})`,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700}}>{nameToAvatar(selected.name)}</div>
             <div>
               <div style={{fontSize:17,fontWeight:700}}>{selected.name}</div>
               {shift&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>シフト: {shift.start_time} 〜 {shift.end_time}</div>}
@@ -599,7 +599,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
               const SB2={absent:C.border2,working:C.greenBg,done:C.blueBg};
               return (
                 <div key={s.id} style={{display:"flex",alignItems:"center",padding:"10px 14px",gap:10,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none"}}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{nameToAvatar(s.name)}</div>
+                  <div style={{width:30,height:30,borderRadius:"50%",background:"#1e1e1e",color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{nameToAvatar(s.name)}</div>
                   <div style={{flex:1,fontSize:13,fontWeight:600}}>{s.name}</div>
                   <div style={{fontSize:11,color:C.muted,textAlign:"right",minWidth:100}}>
                     {a?.clock_in&&<div>出勤 {fmtHM(a.clock_in)}</div>}
@@ -810,7 +810,7 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
           return (
             <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?"#111":"#0d0d0d"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:28,height:28,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{nameToAvatar(s.name)}</div>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"#1e1e1e",color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{nameToAvatar(s.name)}</div>
                 <span style={{fontSize:13,fontWeight:600}}>{s.name}</span>
               </div>
               <div style={{textAlign:"right",fontSize:13,fontWeight:700}}>¥{s.wage?.toLocaleString()}</div>
@@ -819,8 +819,8 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
               <div style={{display:"flex",gap:5,alignItems:"center"}}>
                 <input type="number" value={editing[s.id]??s.wage??""} min={900} max={5000}
                   onChange={e=>setEditing(p=>({...p,[s.id]:e.target.value}))}
-                  style={{width:65,padding:"5px 6px",borderRadius:7,border:`1px solid ${C.border}`,fontFamily:"inherit",fontSize:12,textAlign:"right",outline:"none"}}/>
-                <button onClick={()=>save(s.id,s.wage)} style={{padding:"5px 8px",borderRadius:8,border:"none",background:C.ink,color:"#fffaf3",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>更新</button>
+                  style={{width:65,padding:"5px 6px",borderRadius:7,border:`1px solid ${C.border}`,fontFamily:"inherit",fontSize:12,textAlign:"right",outline:"none",background:C.bg,color:C.ink,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+                <button onClick={()=>save(s.id,s.wage)} style={{padding:"5px 8px",borderRadius:8,border:"none",background:C.gold,color:"#0a0a0a",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>更新</button>
               </div>
             </div>
           );
@@ -916,7 +916,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
           <div key={s.id}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center",padding:"12px 16px",borderBottom:editId===s.id||i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?"#111":"#0d0d0d"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{nameToAvatar(s.name)}</div>
+                <div style={{width:32,height:32,borderRadius:"50%",background:"#1e1e1e",color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{nameToAvatar(s.name)}</div>
                 <div style={{fontSize:13,fontWeight:700}}>{s.name}</div>
               </div>
               <div style={{fontSize:12,fontFamily:"monospace"}}>{s.username}</div>
@@ -969,7 +969,7 @@ function Modal({children,onClose}){
 }
 const NB={padding:"6px 14px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,color:C.muted};
 const LS={display:"flex",flexDirection:"column",gap:5,fontSize:12,color:"#8b6f5a",flex:1};
-const SS={padding:"8px 10px",borderRadius:8,border:`1px solid #e8d5bc`,fontFamily:"inherit",fontSize:13,background:"#fdf6ee",color:"#2d1a0e"};
+const SS={padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink};
 const PB=bg=>{
   const lightBgs=["#fffaf3","#fdf6ee","#fee2e2",C.gold,C.gold2];
   const isDark=bg===C.ink||bg===C.accent;
