@@ -270,7 +270,7 @@ function LoginPage({onSuccess,staff}){
   }
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,minHeight:"100vh",fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif"}}>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
       <div style={{marginBottom:28,textAlign:"center"}}>
         {CONFIG.logoWideBase64
@@ -302,7 +302,7 @@ function LoginPage({onSuccess,staff}){
             <button onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted}}>{showPw?"🙈":"👁"}</button>
           </div>
         </div>
-        {error&&<div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:14,padding:"8px 12px",background:"#fee2e2",borderRadius:8}}>{locked?"🚫 ":"❌ "}{error}</div>}
+        {error&&<div style={{fontSize:12,color:"#ef4444",fontWeight:600,marginBottom:14,padding:"8px 12px",background:"#2a0d0d",borderRadius:8}}>{locked?"🚫 ":"❌ "}{error}</div>}
         <button onClick={handleLogin} disabled={!username||!password||locked}
           style={{width:"100%",padding:13,borderRadius:10,border:"none",background:!username||!password||locked?"#1a1a1a":C.gold,color:!username||!password||locked?"#444":"#0a0a0a",fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer"}}>
           ログイン
@@ -365,17 +365,17 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
   const s=currentUser;
 
   function verdict(sh,att){
-    if(!sh&&!att?.clock_in) return {label:"休日",bg:"#f1f5f9",color:"#94a3b8"};
-    if(!sh&& att?.clock_in) return {label:"シフト外",bg:"#e0f2fe",color:"#075985"};
-    if( sh&&!att?.clock_in) return {label:"欠勤",bg:"#fee2e2",color:"#991b1b"};
+    if(!sh&&!att?.clock_in) return {label:"休日",bg:"#161616",color:"#444"};
+    if(!sh&& att?.clock_in) return {label:"シフト外",bg:"#0d1a2a",color:"#5b8dee"};
+    if( sh&&!att?.clock_in) return {label:"欠勤",bg:"#2a0d0d",color:"#e74c3c"};
     if(!att?.clock_out)     return {label:"勤務中",bg:C.greenBg,color:"#065f46"};
     const aIn=new Date(att.clock_in),aOut=new Date(att.clock_out);
     const aInM=aIn.getHours()*60+aIn.getMinutes(),aOutM=aOut.getHours()*60+aOut.getMinutes();
     const late=aInM>toMin(sh.start_time)+5,early=aOutM<toMin(sh.end_time)-5;
-    if(late&&early) return {label:"遅刻・早退",bg:"#fee2e2",color:"#991b1b"};
-    if(late)        return {label:"遅刻",bg:"#fef3c7",color:"#92400e"};
-    if(early)       return {label:"早退",bg:"#ede9fe",color:"#5b21b6"};
-    return              {label:"正常",bg:C.greenBg,color:"#065f46"};
+    if(late&&early) return {label:"遅刻・早退",bg:"#2a0d0d",color:"#e74c3c"};
+    if(late)        return {label:"遅刻",bg:"#1a1400",color:"#c9a84c"};
+    if(early)       return {label:"早退",bg:"#140d2a",color:"#9b7fe8"};
+    return              {label:"正常",bg:C.greenBg,color:C.green};
   }
 
   const monthTotal=monthDates.reduce((acc,d)=>{
@@ -398,7 +398,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
-          <thead><tr style={{background:C.surface2,color:C.muted}}>
+          <thead><tr style={{background:"#161616",color:"#555555"}}>
             {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
           <tbody>
@@ -407,8 +407,8 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
               const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
-                <tr key={i} style={{borderBottom:`1px solid ${C.border}`,background:isToday?"#fef9ec":isWE?"#fdf4f4":i%2===0?C.paper:C.bg}}>
-                  <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
+                <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?C.paper:C.bg}}>
+                  <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:"#aaa",whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
                   <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:"#cbd5e1",whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
                   <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:C.blue}}>{fmtHM(att.clock_in)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
@@ -419,7 +419,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
               );
             })}
           </tbody>
-          <tfoot><tr style={{background:C.surface2,color:C.muted}}>
+          <tfoot><tr style={{background:"#161616",color:"#555555"}}>
             <td colSpan={5} style={{padding:"10px 12px",fontWeight:700,fontSize:12}}>月合計</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>¥{monthTotal.pay.toLocaleString()}</td>
@@ -459,7 +459,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
       <WeekNav dates={dates} offset={weekOffset} setOffset={setWeekOffset}/>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:560}}>
-          <thead><tr style={{background:C.surface2,color:C.muted}}>
+          <thead><tr style={{background:"#161616",color:"#555555"}}>
             <th style={{padding:"10px 12px",textAlign:"left",width:88}}>スタッフ</th>
             {dates.map((d,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",color:i>=5?C.gold:"#fffaf3",minWidth:70}}><div>{DAYS_JP[i]}</div><div style={{fontSize:10,opacity:0.7}}>{fmtDate(d)}</div></th>)}
           </tr></thead>
@@ -498,7 +498,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
             <label style={LS}>退勤時刻<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS.map(t=><option key={t}>{t}</option>)}</select></label>
           </div>
           <button onClick={save} disabled={saving} style={PB(C.ink)}>{saving?"保存中...":"💾 保存する"}</button>
-          {getShiftByDate(dates[modal.dayIdx],modal.staffId)&&<button onClick={remove} disabled={saving} style={{...PB("#fee2e2"),color:C.accent,marginTop:8}}>🗑 削除する</button>}
+          {getShiftByDate(dates[modal.dayIdx],modal.staffId)&&<button onClick={remove} disabled={saving} style={{...PB("#2a0d0d"),color:C.accent,marginTop:8}}>🗑 削除する</button>}
         </Modal>
       )}
     </div>
@@ -542,7 +542,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
 
   const SL={absent:"未出勤",working:"勤務中",done:"退勤済"};
   const SC={absent:C.muted,working:C.green,done:C.blue};
-  const SB={absent:"#f1f5f9",working:C.greenBg,done:C.blueBg};
+  const SB={absent:C.border2,working:C.greenBg,done:C.blueBg};
 
   return (
     <div>
@@ -579,7 +579,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
               </div>
             ))}
           </div>
-          {gps!=="idle"&&<div style={{marginBottom:14,padding:"9px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:gps==="ok"?C.greenBg:gps==="checking"?"#fef9ec":"#fee2e2",color:gps==="ok"?"#065f46":gps==="checking"?"#92400e":"#991b1b",display:"flex",alignItems:"center",gap:8}}><span>{gps==="checking"?"📡":gps==="ok"?"📍":"🚫"}</span>{gpsMsg}</div>}
+          {gps!=="idle"&&<div style={{marginBottom:14,padding:"9px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:gps==="ok"?C.greenBg:gps==="checking"?"#1a1400":"#2a0d0d",color:gps==="ok"?C.green:gps==="checking"?C.gold:"#e74c3c",display:"flex",alignItems:"center",gap:8}}><span>{gps==="checking"?"📡":gps==="ok"?"📍":"🚫"}</span>{gpsMsg}</div>}
           <div style={{display:"flex",gap:10}}>
             <button disabled={!!att?.clock_in||gps==="checking"||punching} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:!att?.clock_in&&gps!=="checking"&&!punching?C.green:"#e2e8f0",color:!att?.clock_in&&gps!=="checking"&&!punching?"#fff":"#94a3b8",fontSize:13,fontWeight:700,cursor:!att?.clock_in&&gps!=="checking"&&!punching?"pointer":"not-allowed",fontFamily:"inherit"}}>🟢 出勤打刻</button>
             <button disabled={!att?.clock_in||!!att?.clock_out||gps==="checking"||punching} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?C.blue:"#e2e8f0",color:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"#fff":"#94a3b8",fontSize:13,fontWeight:700,cursor:att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching?"pointer":"not-allowed",fontFamily:"inherit"}}>🔵 退勤打刻</button>
@@ -596,7 +596,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
               const a=getAtt(s.id,today),st=!a?.clock_in?"absent":!a?.clock_out?"working":"done";
               const SL2={absent:"未出勤",working:"勤務中",done:"退勤済"};
               const SC2={absent:C.muted,working:C.green,done:C.blue};
-              const SB2={absent:"#f1f5f9",working:C.greenBg,done:C.blueBg};
+              const SB2={absent:C.border2,working:C.greenBg,done:C.blueBg};
               return (
                 <div key={s.id} style={{display:"flex",alignItems:"center",padding:"10px 14px",gap:10,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none"}}>
                   <div style={{width:30,height:30,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{nameToAvatar(s.name)}</div>
@@ -627,17 +627,17 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
   const DAYS_JA=["日","月","火","水","木","金","土"];
 
   function verdict(sh,att){
-    if(!sh&&!att?.clock_in) return {label:"休日",bg:"#f1f5f9",color:"#94a3b8"};
-    if(!sh&& att?.clock_in) return {label:"シフト外",bg:"#e0f2fe",color:"#075985"};
-    if( sh&&!att?.clock_in) return {label:"欠勤",bg:"#fee2e2",color:"#991b1b"};
+    if(!sh&&!att?.clock_in) return {label:"休日",bg:"#161616",color:"#444"};
+    if(!sh&& att?.clock_in) return {label:"シフト外",bg:"#0d1a2a",color:"#5b8dee"};
+    if( sh&&!att?.clock_in) return {label:"欠勤",bg:"#2a0d0d",color:"#e74c3c"};
     if(!att?.clock_out)     return {label:"勤務中",bg:C.greenBg,color:"#065f46"};
     const aIn=new Date(att.clock_in),aOut=new Date(att.clock_out);
     const aInM=aIn.getHours()*60+aIn.getMinutes(),aOutM=aOut.getHours()*60+aOut.getMinutes();
     const late=aInM>toMin(sh.start_time)+5,early=aOutM<toMin(sh.end_time)-5;
-    if(late&&early) return {label:"遅刻・早退",bg:"#fee2e2",color:"#991b1b"};
-    if(late)        return {label:"遅刻",bg:"#fef3c7",color:"#92400e"};
-    if(early)       return {label:"早退",bg:"#ede9fe",color:"#5b21b6"};
-    return              {label:"正常",bg:C.greenBg,color:"#065f46"};
+    if(late&&early) return {label:"遅刻・早退",bg:"#2a0d0d",color:"#e74c3c"};
+    if(late)        return {label:"遅刻",bg:"#1a1400",color:"#c9a84c"};
+    if(early)       return {label:"早退",bg:"#140d2a",color:"#9b7fe8"};
+    return              {label:"正常",bg:C.greenBg,color:C.green};
   }
 
   const monthTotal=selStaff?monthDates.reduce((acc,d)=>{
@@ -664,7 +664,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
-          <thead><tr style={{background:C.surface2,color:C.muted}}>
+          <thead><tr style={{background:"#161616",color:"#555555"}}>
             {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
           <tbody>
@@ -673,8 +673,8 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
               const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
-                <tr key={i} style={{borderBottom:`1px solid ${C.border}`,background:isToday?"#fef9ec":isWE?"#fdf4f4":i%2===0?C.paper:C.bg}}>
-                  <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
+                <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?C.paper:C.bg}}>
+                  <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:"#aaa",whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
                   <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:"#cbd5e1",whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
                   <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:C.blue}}>{fmtHM(att.clock_in)}</span>:<span style={{color:"#cbd5e1"}}>──</span>}</td>
@@ -685,7 +685,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
               );
             })}
           </tbody>
-          <tfoot><tr style={{background:C.surface2,color:C.muted}}>
+          <tfoot><tr style={{background:"#161616",color:"#555555"}}>
             <td colSpan={5} style={{padding:"10px 12px",fontWeight:700,fontSize:12}}>月合計</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
             <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>¥{monthTotal.pay.toLocaleString()}</td>
@@ -749,13 +749,13 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
           const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
           const hasRecord=att?.clock_in||att?.clock_out;
           return (
-            <div key={i} style={{display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,alignItems:"center",padding:"8px 14px",borderBottom:i<monthDates.length-1?`1px solid ${C.border}`:"none",background:isToday?"#fef9ec":isWE?"#fdf4f4":i%2===0?C.paper:C.bg}}>
+            <div key={i} style={{display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,alignItems:"center",padding:"8px 14px",borderBottom:i<monthDates.length-1?`1px solid ${C.border}`:"none",background:isToday?"#1a1400":isWE?"#111":i%2===0?C.paper:C.bg}}>
               <span style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?C.gold:C.ink}}>{month+1}/{d.getDate()}{isToday?" ✦":""}</span>
-              <span style={{fontSize:12,color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</span>
+              <span style={{fontSize:12,color:isWE?C.gold:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</span>
               <span style={{fontSize:11,color:sh?C.green:"#cbd5e1"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</span>
               <span style={{fontSize:12,color:att?.clock_in?C.blue:"#cbd5e1",fontWeight:att?.clock_in?600:400}}>{att?.clock_in?fmtHM(att.clock_in):"──"}</span>
               <span style={{fontSize:12,color:att?.clock_out?"#7c3aed":"#cbd5e1",fontWeight:att?.clock_out?600:400}}>{att?.clock_out?fmtHM(att.clock_out):"──"}</span>
-              <button onClick={()=>openEdit(d)} style={{padding:"4px 8px",borderRadius:8,border:`1px solid ${C.border}`,background:hasRecord?"#fef9ec":C.bg,color:C.ink,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
+              <button onClick={()=>openEdit(d)} style={{padding:"4px 8px",borderRadius:8,border:`1px solid ${C.border}`,background:hasRecord?"#1a1500":C.bg,color:C.ink,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
                 {hasRecord?"✏️ 編集":"➕ 追加"}
               </button>
             </div>
@@ -772,7 +772,7 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
           </div>
           <div style={{fontSize:11,color:C.muted,marginBottom:18}}>※ 空欄にすると該当の打刻を削除します</div>
           <button onClick={saveEdit} disabled={saving} style={PB(C.ink)}>{saving?"保存中...":"💾 保存する"}</button>
-          <button onClick={deleteDay} disabled={saving} style={{...PB("#fee2e2"),color:C.accent,marginTop:8}}>🗑 この日の記録を全削除</button>
+          <button onClick={deleteDay} disabled={saving} style={{...PB("#2a0d0d"),color:C.accent,marginTop:8}}>🗑 この日の記録を全削除</button>
         </Modal>
       )}
     </div>
@@ -923,11 +923,11 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
               <div style={{fontSize:13,fontWeight:700,textAlign:"right"}}>¥{s.wage?.toLocaleString()}</div>
               <div style={{display:"flex",gap:5,justifyContent:"center"}}>
                 <button onClick={()=>openEdit(s)} style={{padding:"4px 8px",borderRadius:7,border:`1px solid ${C.border}`,background:C.bg,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>✏️</button>
-                <button onClick={()=>setDeleteConfirm(s.id)} style={{padding:"4px 8px",borderRadius:7,border:"1px solid #fca5a5",background:"#fee2e2",fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,color:C.accent}}>🗑</button>
+                <button onClick={()=>setDeleteConfirm(s.id)} style={{padding:"4px 8px",borderRadius:7,border:"1px solid #5a1a1a",background:"#2a0d0d",fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,color:C.accent}}>🗑</button>
               </div>
             </div>
             {editId===s.id&&(
-              <div style={{padding:"16px 16px",background:"#fef9ec",borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",borderTop:`1px solid ${C.gold}`}}>
+              <div style={{padding:"16px 16px",background:C.surface2,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",borderTop:`1px solid ${C.gold}`}}>
                 <div style={{fontSize:12,fontWeight:700,marginBottom:12}}>{s.name} を編集</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                   <div>{FField("name","氏名")}</div>
@@ -948,7 +948,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
         <Modal onClose={()=>setDeleteConfirm(null)}>
           <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>🗑 アカウント削除</div>
           <div style={{fontSize:13,color:C.muted,marginBottom:20}}>{staff.find(s=>s.id===deleteConfirm)?.name} のアカウントを削除しますか？<br/><span style={{color:C.accent,fontSize:12}}>この操作は取り消せません。</span></div>
-          <button onClick={async()=>{setSaving(true);await deleteStaff(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...PB(C.accent),marginBottom:8}}>{saving?"削除中...":"削除する"}</button>
+          <button onClick={async()=>{setSaving(true);await deleteStaff(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...{...PB("#2a0d0d"),color:C.accent,border:`1px solid ${C.accent}`},marginBottom:8}}>{saving?"削除中...":"削除する"}</button>
         </Modal>
       )}
     </div>
