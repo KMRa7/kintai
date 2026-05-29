@@ -390,14 +390,14 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
         {[["出勤日数",`${monthDates.filter(d=>{const a=getAtt(s.id,d);return a?.clock_in&&a?.clock_out;}).length}日`,C.green],["総勤務時間",`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],["合計給与",`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
-          <div key={label} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
+          <div key={label} style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
             <div style={{fontSize:10,color:C.muted,marginBottom:3}}>{label}</div>
             <div style={{fontSize:16,fontWeight:700,color}}>{val}</div>
           </div>
         ))}
       </div>
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
+        <table style={{width:"100%",borderCollapse:"collapse",background:"#111",borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
           <thead><tr style={{background:"#161616",color:"#555555"}}>
             {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
@@ -407,7 +407,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
               const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
-                <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?C.paper:C.bg}}>
+                <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?"#111":"#0d0d0d"}}>
                   <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:"#aaa",whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
                   <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:"#cbd5e1",whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
@@ -458,14 +458,14 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
       <SectionTitle icon="📅" title="シフト入力" sub="週ごとにスタッフのシフトを入力してください"/>
       <WeekNav dates={dates} offset={weekOffset} setOffset={setWeekOffset}/>
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:560}}>
+        <table style={{width:"100%",borderCollapse:"collapse",background:"#111",borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:560}}>
           <thead><tr style={{background:"#161616",color:"#555555"}}>
             <th style={{padding:"10px 12px",textAlign:"left",width:88}}>スタッフ</th>
             {dates.map((d,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",color:i>=5?C.gold:"#fffaf3",minWidth:70}}><div>{DAYS_JP[i]}</div><div style={{fontSize:10,opacity:0.7}}>{fmtDate(d)}</div></th>)}
           </tr></thead>
           <tbody>
             {staff.map((s,si)=>(
-              <tr key={s.id} style={{borderBottom:`1px solid ${C.border}`,background:si%2===0?C.paper:C.bg}}>
+              <tr key={s.id} style={{borderBottom:`1px solid ${C.border}`,background:si%2===0?"#111":"#0d0d0d"}}>
                 <td style={{padding:"10px",fontWeight:700}}>
                   <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:"50%",background:"#e8d5bc",color:C.muted,fontSize:11,fontWeight:700,marginRight:5}}>{nameToAvatar(s.name)}</span>
                   {s.name.split(" ")[0]}
@@ -562,7 +562,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
         </div>
       )}
       {selected&&(
-        <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+        <div style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
             <div style={{width:46,height:46,borderRadius:"50%",background:C.ink,color:C.gold,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700}}>{nameToAvatar(selected.name)}</div>
             <div>
@@ -573,7 +573,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
             {[["出勤","🟢",att?.clock_in],["退勤","🔵",att?.clock_out]].map(([label,icon,ts])=>(
-              <div key={label} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+              <div key={label} style={{background:"#0d0d0d",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
                 <div style={{fontSize:11,color:C.muted,marginBottom:3}}>{icon} {label}時刻</div>
                 <div style={{fontSize:19,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{ts?fmtHM(ts):"──"}</div>
               </div>
@@ -591,7 +591,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
       {!singleUser&&(
         <div style={{marginTop:24}}>
           <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10}}>📋 本日の出勤状況</div>
-          <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
             {staff.map((s,i)=>{
               const a=getAtt(s.id,today),st=!a?.clock_in?"absent":!a?.clock_out?"working":"done";
               const SL2={absent:"未出勤",working:"勤務中",done:"退勤済"};
@@ -652,18 +652,18 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
       <SectionTitle icon="🔍" title="シフト照合" sub="シフト予定と実際の出退勤を比較します"/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
-        {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${selStaff.id===s.id?C.ink:C.border}`,background:selStaff.id===s.id?C.ink:C.paper,color:selStaff.id===s.id?"#fffaf3":C.ink,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600}}>{nameToAvatar(s.name)} {s.name}</button>)}
+        {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${selStaff.id===s.id?C.gold:C.border}`,background:selStaff.id===s.id?C.gold:"transparent",color:selStaff.id===s.id?"#0a0a0a":C.muted,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600}}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
         {[["出勤日数",`${monthDates.filter(d=>{const a=getAtt(selStaff.id,d);return a?.clock_in&&a?.clock_out;}).length}日`,C.green],["総勤務時間",`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],["合計給与",`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
-          <div key={label} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
+          <div key={label} style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
             <div style={{fontSize:10,color:C.muted,marginBottom:3}}>{label}</div>
             <div style={{fontSize:16,fontWeight:700,color}}>{val}</div>
           </div>
         ))}
       </div>
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
+        <table style={{width:"100%",borderCollapse:"collapse",background:"#111",borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
           <thead><tr style={{background:"#161616",color:"#555555"}}>
             {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
@@ -673,7 +673,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
               const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
-                <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?C.paper:C.bg}}>
+                <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?"#111":"#0d0d0d"}}>
                   <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:"#aaa",whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
                   <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
                   <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:"#cbd5e1",whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
@@ -738,9 +738,9 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
       <SectionTitle icon="✏️" title="勤怠修正" sub="スタッフの出退勤時刻を手動で変更・追加・削除できます"/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-        {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${selStaff.id===s.id?C.ink:C.border}`,background:selStaff.id===s.id?C.ink:C.paper,color:selStaff.id===s.id?"#fffaf3":C.ink,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600}}>{nameToAvatar(s.name)} {s.name}</button>)}
+        {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${selStaff.id===s.id?C.gold:C.border}`,background:selStaff.id===s.id?C.gold:"transparent",color:selStaff.id===s.id?"#0a0a0a":C.muted,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600}}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
-      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
+      <div style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
         <div style={{background:C.surface2,padding:"9px 14px",display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
           <span>日付</span><span>曜</span><span>シフト</span><span>出勤</span><span>退勤</span><span style={{textAlign:"center"}}>修正</span>
         </div>
@@ -749,7 +749,7 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
           const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
           const hasRecord=att?.clock_in||att?.clock_out;
           return (
-            <div key={i} style={{display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,alignItems:"center",padding:"8px 14px",borderBottom:i<monthDates.length-1?`1px solid ${C.border}`:"none",background:isToday?"#1a1400":isWE?"#111":i%2===0?C.paper:C.bg}}>
+            <div key={i} style={{display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,alignItems:"center",padding:"8px 14px",borderBottom:i<monthDates.length-1?`1px solid ${C.border}`:"none",background:isToday?"#1a1400":isWE?"#111":i%2===0?"#111":"#0d0d0d"}}>
               <span style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?C.gold:C.ink}}>{month+1}/{d.getDate()}{isToday?" ✦":""}</span>
               <span style={{fontSize:12,color:isWE?C.gold:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</span>
               <span style={{fontSize:11,color:sh?C.green:"#cbd5e1"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</span>
@@ -801,14 +801,14 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
   return (
     <div>
       <SectionTitle icon="💴" title="時給・給与設定" sub="スタッフごとの時給と今月の給与を確認できます"/>
-      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
+      <div style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
         <div style={{background:C.surface2,padding:"9px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
           <span>スタッフ</span><span style={{textAlign:"right"}}>時給</span><span style={{textAlign:"center"}}>今月実働</span><span style={{textAlign:"right"}}>今月給与</span><span style={{textAlign:"center"}}>変更</span>
         </div>
         {staff.map((s,i)=>{
           const sum=monthSummary(s);
           return (
-            <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?C.paper:C.bg}}>
+            <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?"#111":"#0d0d0d"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:28,height:28,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{nameToAvatar(s.name)}</div>
                 <span style={{fontSize:13,fontWeight:600}}>{s.name}</span>
@@ -890,7 +890,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
     <div>
       <SectionTitle icon="👤" title="アカウント管理" sub="スタッフアカウントの発行・編集・削除"/>
       {showAdd?(
-        <div style={{background:C.paper,border:`1.5px solid ${C.gold}`,borderRadius:14,padding:20,marginBottom:20,boxShadow:C.shadow}}>
+        <div style={{background:C.paper,border:`1px solid ${C.gold}44`,borderRadius:14,padding:20,marginBottom:20,background:"#111",boxShadow:C.shadow}}>
           <div style={{fontSize:14,fontWeight:700,marginBottom:16}}>➕ 新規アカウント発行</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <div>{FField("name","氏名（例: 山本 花子）")}</div>
@@ -904,17 +904,17 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
           </div>
         </div>
       ):(
-        <button onClick={()=>setShowAdd(true)} style={{width:"100%",padding:"12px",marginBottom:20,borderRadius:12,border:`2px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+        <button onClick={()=>setShowAdd(true)} style={{width:"100%",padding:"12px",marginBottom:20,borderRadius:12,border:`1px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>
           ＋ 新規アカウントを発行する
         </button>
       )}
-      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
+      <div style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
         <div style={{background:C.surface2,padding:"9px 16px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center"}}>
           <span>スタッフ</span><span>ユーザー名</span><span style={{textAlign:"right"}}>時給</span><span style={{textAlign:"center"}}>操作</span>
         </div>
         {staff.map((s,i)=>(
           <div key={s.id}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center",padding:"12px 16px",borderBottom:editId===s.id||i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?C.paper:C.bg}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center",padding:"12px 16px",borderBottom:editId===s.id||i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?"#111":"#0d0d0d"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:32,height:32,borderRadius:"50%",background:"#e8d5bc",color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{nameToAvatar(s.name)}</div>
                 <div style={{fontSize:13,fontWeight:700}}>{s.name}</div>
@@ -956,18 +956,18 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
 }
 
 function SectionTitle({icon,title,sub}){
-  return <div style={{marginBottom:18}}><div style={{fontSize:17,fontWeight:700}}>{icon} {title}</div>{sub&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>{sub}</div>}<div style={{height:2,background:`linear-gradient(to right,${C.gold},transparent)`,marginTop:7,borderRadius:2}}/></div>;
+  return <div style={{marginBottom:18}}><div style={{fontSize:17,fontWeight:700}}>{icon} {title}</div>{sub&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>{sub}</div>}<div style={{height:2,background:`linear-gradient(to right,${C.gold}88,transparent)`,marginTop:7,borderRadius:2}}/></div>;
 }
 function WeekNav({dates,offset,setOffset}){
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"9px 14px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}>‹ 前週</button><div style={{fontSize:13,fontWeight:700}}>{fmtDate(dates[0])} 〜 {fmtDate(dates[6])}{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8}}>今週</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>次週 ›</button></div>;
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:"#111",border:`1px solid ${C.border}`,borderRadius:12,padding:"9px 14px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}>‹ 前週</button><div style={{fontSize:13,fontWeight:700}}>{fmtDate(dates[0])} 〜 {fmtDate(dates[6])}{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8}}>今週</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>次週 ›</button></div>;
 }
 function WeekNavMonth({year,month,offset,setOffset}){
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"9px 14px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}>‹ 前月</button><div style={{fontSize:13,fontWeight:700}}>{year}年{month+1}月{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8}}>今月</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>次月 ›</button></div>;
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:"#111",border:`1px solid ${C.border}`,borderRadius:12,padding:"9px 14px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}>‹ 前月</button><div style={{fontSize:13,fontWeight:700}}>{year}年{month+1}月{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8}}>今月</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>次月 ›</button></div>;
 }
 function Modal({children,onClose}){
-  return <div style={{position:"fixed",inset:0,background:"rgba(45,26,14,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900,padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{background:C.paper,borderRadius:18,padding:24,maxWidth:420,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxHeight:"90vh",overflowY:"auto"}}>{children}<button onClick={onClose} style={{width:"100%",padding:"10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontFamily:"inherit",fontSize:13,color:C.muted,cursor:"pointer",marginTop:8}}>キャンセル</button></div></div>;
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900,padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{background:"#111",borderRadius:18,padding:24,maxWidth:420,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.25)",maxHeight:"90vh",overflowY:"auto"}}>{children}<button onClick={onClose} style={{width:"100%",padding:"10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontFamily:"inherit",fontSize:13,color:C.muted,cursor:"pointer",marginTop:8}}>キャンセル</button></div></div>;
 }
-const NB={padding:"6px 14px",background:"transparent",border:`1px solid #e8d5bc`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,color:"#8b6f5a"};
+const NB={padding:"6px 14px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,color:C.muted};
 const LS={display:"flex",flexDirection:"column",gap:5,fontSize:12,color:"#8b6f5a",flex:1};
 const SS={padding:"8px 10px",borderRadius:8,border:`1px solid #e8d5bc`,fontFamily:"inherit",fontSize:13,background:"#fdf6ee",color:"#2d1a0e"};
 const PB=bg=>{
