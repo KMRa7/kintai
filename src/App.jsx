@@ -16,6 +16,22 @@ const TIME_SLOTS = [
 ];
 const DAYS_JP = ["月","火","水","木","金","土","日"];
 const STORE_LAT = CONFIG.storeLat, STORE_LNG = CONFIG.storeLng, STORE_RADIUS_M = CONFIG.storeRadiusM;
+
+// 休憩パターン（絶対時刻ベース。各 [開始分,終了分] が休憩帯）
+const BREAK_PATTERNS = {
+  default: {
+    label: "デフォルト",
+    hint: "9:00〜18:15想定・休憩計135分",
+    breaks: [[600,615],[675,690],[750,810],[870,885],[945,960],[1020,1035]],
+  },
+  cs: {
+    label: "CS",
+    hint: "9:00〜18:00想定・休憩計130分",
+    breaks: [[590,600],[650,660],[710,720],[720,780],[830,840],[890,900],[950,960],[1010,1020]],
+  },
+};
+function breakLabelOf(key){ return (BREAK_PATTERNS[key]||BREAK_PATTERNS.default).label; }
+
 const C = {
   bg: CONFIG.theme.bg,
   paper: CONFIG.theme.paper,
@@ -46,13 +62,23 @@ function fmtHM(ts){ if(!ts) return "──"; const d=new Date(ts); return d.toLo
 function fmtHMS(d){ return d.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
 function toMin(hhmm){ const[h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function nameToAvatar(name){ return name.trim().charAt(0); }
-function calcBillableMinutes(shiftStart,shiftEnd,clockIn,clockOut){
+
+// 指定区間[startMin,endMin]に重なる休憩の合計分
+function breakMinutesInWindow(pattern,startMin,endMin){
+  const p=BREAK_PATTERNS[pattern]||BREAK_PATTERNS.default;
+  return p.breaks.reduce((sum,[bs,be])=>sum+Math.max(0,Math.min(endMin,be)-Math.max(startMin,bs)),0);
+}
+// 早出・残業はシフト時刻に丸め、休憩を差し引いた実働分を返す
+function calcBillableMinutes(shiftStart,shiftEnd,clockIn,clockOut,breakPattern="default"){
   if(!clockIn||!clockOut) return 0;
   const sIn=toMin(shiftStart), sOut=toMin(shiftEnd);
   const aIn=new Date(clockIn), aOut=new Date(clockOut);
   const aInM=aIn.getHours()*60+aIn.getMinutes();
   const aOutM=aOut.getHours()*60+aOut.getMinutes();
-  return Math.max(0, Math.min(aOutM, sOut)-Math.max(aInM, sIn));
+  const wIn=Math.max(aInM,sIn), wOut=Math.min(aOutM,sOut);
+  const worked=Math.max(0,wOut-wIn);
+  const brk=breakMinutesInWindow(breakPattern,wIn,wOut);
+  return Math.max(0,worked-brk);
 }
 function calcDistanceM(lat1,lng1,lat2,lng2){
   const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
@@ -176,8 +202,8 @@ export default function App(){
     setAttendance(p=>p.filter(a=>a.id!==existing.id));
   }
 
-  async function addStaff(name,username,password,wage){
-    const {data}=await supabase.from("staff").insert({name,username,password,wage}).select().single();
+  async function addStaff(name,username,password,wage,breakPattern){
+    const {data}=await supabase.from("staff").insert({name,username,password,wage,break_pattern:breakPattern}).select().single();
     if(data){ setStaff(p=>[...p,data]); showToast(`✅ ${name} のアカウントを発行しました`); }
   }
   async function deleteStaff(id){
@@ -380,13 +406,13 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
 
   const monthTotal=monthDates.reduce((acc,d)=>{
     const sh=getShiftByDate(d,s.id),att=getAtt(s.id,d);
-    const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
+    const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.break_pattern):0;
     return {mins:acc.mins+mins,pay:acc.pay+Math.floor(mins/60*(s.wage||0))};
   },{mins:0,pay:0});
 
   return (
     <div>
-      <SectionTitle icon="📊" title="勤務実績" sub="自分のシフトと打刻の記録"/>
+      <SectionTitle icon="📊" title="勤務実績" sub={`自分のシフトと打刻の記録（休憩: ${breakLabelOf(s.break_pattern)}）`}/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
         {[["出勤日数",`${monthDates.filter(d=>{const a=getAtt(s.id,d);return a?.clock_in&&a?.clock_out;}).length}日`,C.green],["総勤務時間",`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],["合計給与",`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
@@ -404,7 +430,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate,attendance}){
           <tbody>
             {monthDates.map((d,i)=>{
               const sh=getShiftByDate(d,s.id),att=getAtt(s.id,d),vd=verdict(sh,att);
-              const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
+              const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.break_pattern):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
                 <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?"#111":"#0d0d0d"}}>
@@ -505,7 +531,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
   );
 }
 
-// ★ 修正済み：管理者はGPSスキップ、スタッフはGPS必須
+// ★ 管理者はGPSスキップ、スタッフはGPS必須
 function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}){
   const [selected,setSelected]=useState(singleUser?staff[0]:null);
   const [gps,setGps]=useState("idle");
@@ -642,7 +668,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
 
   const monthTotal=selStaff?monthDates.reduce((acc,d)=>{
     const sh=getShiftByDate(d,selStaff.id),att=getAtt(selStaff.id,d);
-    const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
+    const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,selStaff.break_pattern):0;
     return {mins:acc.mins+mins,pay:acc.pay+Math.floor(mins/60*(selStaff.wage||0))};
   },{mins:0,pay:0}):{mins:0,pay:0};
 
@@ -654,6 +680,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
         {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${selStaff.id===s.id?C.gold:C.border}`,background:selStaff.id===s.id?C.gold:"transparent",color:selStaff.id===s.id?"#0a0a0a":C.muted,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600}}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
+      <div style={{fontSize:11,color:C.muted,marginBottom:10}}>休憩パターン: <span style={{color:C.gold,fontWeight:700}}>{breakLabelOf(selStaff.break_pattern)}</span></div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
         {[["出勤日数",`${monthDates.filter(d=>{const a=getAtt(selStaff.id,d);return a?.clock_in&&a?.clock_out;}).length}日`,C.green],["総勤務時間",`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],["合計給与",`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
           <div key={label} style={{background:"#111",border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
@@ -670,7 +697,7 @@ function CompareView({staff,attendance,getShiftByDate,getAtt}){
           <tbody>
             {monthDates.map((d,i)=>{
               const sh=getShiftByDate(d,selStaff.id),att=getAtt(selStaff.id,d),vd=verdict(sh,att);
-              const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
+              const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,selStaff.break_pattern):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
                 <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?"#1a1400":isWE?"#111":i%2===0?"#111":"#0d0d0d"}}>
@@ -793,7 +820,7 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
   function monthSummary(s){
     return monthDates.reduce((acc,d)=>{
       const sh=getShiftByDate(d,s.id),att=attendance.find(a=>a.staff_id===s.id&&a.date===toDateStr(d));
-      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out):0;
+      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.break_pattern):0;
       return {mins:acc.mins+mins,pay:acc.pay+Math.floor(mins/60*(s.wage||0))};
     },{mins:0,pay:0});
   }
@@ -811,7 +838,10 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
             <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?"#111":"#0d0d0d"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:28,height:28,borderRadius:"50%",background:"#1e1e1e",color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{nameToAvatar(s.name)}</div>
-                <span style={{fontSize:13,fontWeight:600}}>{s.name}</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{s.name}</div>
+                  <div style={{fontSize:10,color:C.muted}}>休憩: {breakLabelOf(s.break_pattern)}</div>
+                </div>
               </div>
               <div style={{textAlign:"right",fontSize:13,fontWeight:700}}>¥{s.wage?.toLocaleString()}</div>
               <div style={{textAlign:"center",fontSize:12,color:C.muted}}>{Math.floor(sum.mins/60)}h{sum.mins%60}m</div>
@@ -826,7 +856,7 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
           );
         })}
       </div>
-      <div style={{marginTop:10,fontSize:11,color:C.muted}}>※ シフト時間で計算（早出・残業は一切カウントしません）。</div>
+      <div style={{marginTop:10,fontSize:11,color:C.muted}}>※ シフト時間で計算（早出・残業は一切カウントしません）。休憩は各スタッフの休憩パターンに応じて差し引きます。</div>
     </div>
   );
 }
@@ -834,7 +864,7 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
 function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
   const [showAdd,setShowAdd]=useState(false);
   const [editId,setEditId]=useState(null);
-  const [form,setForm]=useState({name:"",username:"",password:"",wage:""});
+  const [form,setForm]=useState({name:"",username:"",password:"",wage:"",break_pattern:"default"});
   const [errors,setErrors]=useState({});
   const [deleteConfirm,setDeleteConfirm]=useState(null);
   const [saving,setSaving]=useState(false);
@@ -856,13 +886,13 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
     const errs=validate(form); setErrors(errs);
     if(Object.keys(errs).length>0) return;
     setSaving(true);
-    await addStaff(form.name.trim(),form.username.trim(),form.password,parseInt(form.wage));
-    setForm({name:"",username:"",password:"",wage:""}); setShowAdd(false); setErrors({}); setSaving(false);
+    await addStaff(form.name.trim(),form.username.trim(),form.password,parseInt(form.wage),form.break_pattern);
+    setForm({name:"",username:"",password:"",wage:"",break_pattern:"default"}); setShowAdd(false); setErrors({}); setSaving(false);
   }
 
   function openEdit(s){
     setEditId(s.id);
-    setForm({name:s.name,username:s.username,password:s.password,wage:String(s.wage||"")});
+    setForm({name:s.name,username:s.username,password:s.password,wage:String(s.wage||""),break_pattern:s.break_pattern||"default"});
     setErrors({});
   }
 
@@ -870,7 +900,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
     const errs=validate(form,editId); setErrors(errs);
     if(Object.keys(errs).length>0) return;
     setSaving(true);
-    await updateStaff(editId,{name:form.name.trim(),username:form.username.trim(),password:form.password,wage:parseInt(form.wage)});
+    await updateStaff(editId,{name:form.name.trim(),username:form.username.trim(),password:form.password,wage:parseInt(form.wage),break_pattern:form.break_pattern});
     setEditId(null); setErrors({}); setSaving(false);
   }
 
@@ -886,17 +916,31 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
     );
   }
 
+  function BreakField(){
+    return (
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:4}}>休憩パターン</label>
+        <select value={form.break_pattern} onChange={e=>setForm(p=>({...p,break_pattern:e.target.value}))}
+          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box"}}>
+          {Object.entries(BREAK_PATTERNS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <div style={{fontSize:10,color:C.muted,marginTop:3}}>{(BREAK_PATTERNS[form.break_pattern]||BREAK_PATTERNS.default).hint}</div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <SectionTitle icon="👤" title="アカウント管理" sub="スタッフアカウントの発行・編集・削除"/>
       {showAdd?(
-        <div style={{background:C.paper,border:`1px solid ${C.gold}44`,borderRadius:14,padding:20,marginBottom:20,background:"#111",boxShadow:C.shadow}}>
+        <div style={{border:`1px solid ${C.gold}44`,borderRadius:14,padding:20,marginBottom:20,background:"#111",boxShadow:C.shadow}}>
           <div style={{fontSize:14,fontWeight:700,marginBottom:16}}>➕ 新規アカウント発行</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <div>{FField("name","氏名（例: 山本 花子）")}</div>
             <div>{FField("username","ユーザー名（半角英数字）")}</div>
             <div>{FField("password","パスワード（4文字以上）","password")}</div>
             <div>{FField("wage","時給（円）","number")}</div>
+            <div>{BreakField()}</div>
           </div>
           <div style={{display:"flex",gap:10,marginTop:4}}>
             <button onClick={handleAdd} disabled={saving} style={{...PB(C.ink),flex:1}}>{saving?"発行中...":"✅ 発行する"}</button>
@@ -917,7 +961,10 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
             <div style={{display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center",padding:"12px 16px",borderBottom:editId===s.id||i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?"#111":"#0d0d0d"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:32,height:32,borderRadius:"50%",background:"#1e1e1e",color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{nameToAvatar(s.name)}</div>
-                <div style={{fontSize:13,fontWeight:700}}>{s.name}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700}}>{s.name}</div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:1}}>休憩: {breakLabelOf(s.break_pattern)}</div>
+                </div>
               </div>
               <div style={{fontSize:12,fontFamily:"monospace"}}>{s.username}</div>
               <div style={{fontSize:13,fontWeight:700,textAlign:"right"}}>¥{s.wage?.toLocaleString()}</div>
@@ -934,6 +981,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,showToast}){
                   <div>{FField("username","ユーザー名")}</div>
                   <div>{FField("password","パスワード","password")}</div>
                   <div>{FField("wage","時給（円）","number")}</div>
+                  <div>{BreakField()}</div>
                 </div>
                 <div style={{display:"flex",gap:10,marginTop:4}}>
                   <button onClick={handleUpdate} disabled={saving} style={{...PB(C.ink),flex:1}}>{saving?"保存中...":"💾 保存する"}</button>
