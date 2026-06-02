@@ -52,7 +52,7 @@ function calcBillableMinutes(shiftStart,shiftEnd,clockIn,clockOut){
   const aIn=new Date(clockIn), aOut=new Date(clockOut);
   const aInM=aIn.getHours()*60+aIn.getMinutes();
   const aOutM=aOut.getHours()*60+aOut.getMinutes();
-  return Math.max(0, Math.min(aOutM, sOut+15)-Math.max(aInM, sIn));
+  return Math.max(0, Math.min(aOutM, sOut)-Math.max(aInM, sIn));
 }
 function calcDistanceM(lat1,lng1,lat2,lng2){
   const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
@@ -826,7 +826,7 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
           );
         })}
       </div>
-      <div style={{marginTop:10,fontSize:11,color:C.muted}}>※ 早出は反映なし。残業は15分を上限に計算。</div>
+      <div style={{marginTop:10,fontSize:11,color:C.muted}}>※ シフト時間で計算（早出・残業は一切カウントしません）。</div>
     </div>
   );
 }
