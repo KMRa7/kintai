@@ -1,0 +1,24 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 毎日UTC3:00（日本時間12:00）に実行
+  workflow_dispatch:        # 手動実行も可能
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping udon Supabase
+        run: |
+          curl -s "${{ secrets.UDON_SUPABASE_URL }}/rest/v1/staff?select=id&limit=1" \
+            -H "apikey: ${{ secrets.UDON_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.UDON_SUPABASE_ANON_KEY }}" \
+            -o /dev/null -w "udon: %{http_code}\n"
+
+      - name: Ping derby Supabase
+        run: |
+          curl -s "${{ secrets.DERBY_SUPABASE_URL }}/rest/v1/staff?select=id&limit=1" \
+            -H "apikey: ${{ secrets.DERBY_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.DERBY_SUPABASE_ANON_KEY }}" \
+            -o /dev/null -w "derby: %{http_code}\n"
