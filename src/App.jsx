@@ -369,7 +369,7 @@ function LoginPage({onSuccess,staff}){
   }
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:SANS,position:"relative"}}>
+    <div style={{minHeight:"100vh",background:C.bg,color:C.ink,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:SANS,position:"relative"}}>
       <link href={FONT_LINK} rel="stylesheet"/>
       <div style={{position:"absolute",top:18,right:18}}><LangToggle/></div>
       <div style={{marginBottom:28,textAlign:"center"}}>
@@ -383,7 +383,7 @@ function LoginPage({onSuccess,staff}){
         <div style={{fontSize:11,color:C.gold,letterSpacing:"0.16em",marginTop:4}}>{CONFIG.brandName}</div>
       </div>
       <div style={{background:C.paper,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:360,boxShadow:C.shadow,border:`1px solid ${C.border}`}}>
-        <div style={{fontSize:15,fontWeight:600,marginBottom:20,fontFamily:SERIF}}>{t("login")}</div>
+        <div style={{fontSize:15,fontWeight:600,marginBottom:20,fontFamily:SERIF,color:C.ink}}>{t("login")}</div>
         <div style={{marginBottom:14}}>
           <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("username")}</label>
           <input type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}}
@@ -404,7 +404,7 @@ function LoginPage({onSuccess,staff}){
         </div>
         {error&&<div style={{fontSize:12,color:C.accent,fontWeight:600,marginBottom:14,padding:"8px 12px",background:DANGER_BG,borderRadius:8,display:"flex",alignItems:"center",gap:7}}><Icon name={locked?"lock":"x"} size={14}/>{error}</div>}
         <button onClick={handleLogin} disabled={!username||!password||locked}
-          style={{width:"100%",padding:13,borderRadius:10,border:"none",background:!username||!password||locked?C.surface2:C.gold,color:!username||!password||locked?C.muted:ON_GOLD,fontFamily:SANS,fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          style={{width:"100%",padding:13,borderRadius:10,border:(!username||!password||locked)?`1px solid ${C.border}`:"none",background:!username||!password||locked?C.surface2:C.gold,color:!username||!password||locked?C.muted:ON_GOLD,fontFamily:SANS,fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
           <Icon name="arrowR" size={16}/>{t("login")}
         </button>
       </div>
@@ -702,8 +702,8 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
           </div>
           {gps!=="idle"&&<div style={{marginBottom:14,padding:"10px 14px",borderRadius:10,fontSize:12,fontWeight:700,background:gpsBg,color:gpsColor,display:"flex",alignItems:"center",gap:8}}><Icon name={gpsIcon} size={16}/>{gpsMsg}</div>}
           <div style={{display:"flex",gap:10}}>
-            <button disabled={!canIn} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:canIn?C.green:C.surface2,color:canIn?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canIn?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="check" size={16}/>{t("btn_in")}</button>
-            <button disabled={!canOut} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:canOut?C.blue:C.surface2,color:canOut?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canOut?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="power" size={16}/>{t("btn_out")}</button>
+            <button disabled={!canIn} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:canIn?"none":`1px solid ${C.border}`,background:canIn?C.green:C.surface2,color:canIn?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canIn?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="check" size={16}/>{t("btn_in")}</button>
+            <button disabled={!canOut} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:canOut?"none":`1px solid ${C.border}`,background:canOut?C.blue:C.surface2,color:canOut?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canOut?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="power" size={16}/>{t("btn_out")}</button>
           </div>
           {singleUser&&<div style={{marginTop:11,textAlign:"center",fontSize:11,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pin" size={13}/>{t("gps_note",CONFIG.storeAddress,STORE_RADIUS_M)}</div>}
           {!singleUser&&<div style={{marginTop:11,textAlign:"center",fontSize:11,color:C.gold,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="signal" size={13}/>{t("admin_note")}</div>}
