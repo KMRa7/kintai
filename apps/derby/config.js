@@ -1,7 +1,7 @@
 const config = {
   appName: "勤怠管理システム",
   brandName: "DERBY",
-  emoji: "🏢",
+  emoji: "🏢",                 // legacy fallback only — UI now uses the 勤 seal / line icons
   themeColor: "#0a0a0c",
   adminPassword: "derby2024",
   storeLat: 34.6882,
@@ -21,13 +21,13 @@ const config = {
     gold: "#c9a84c",
     gold2: "#e8c97a",
     green: "#2ecc71",
-    greenBg: "#1e3a2a",
+    greenBg: "#15281d",
     greenBorder: "#2d4a2d",
     border: "#26262a",
-    border2: "#1c1c20",
-    shadow: "0 2px 20px rgba(0,0,0,0.5)",
+    border2: "#1f1f23",
+    shadow: "0 2px 16px rgba(0,0,0,0.45)",
     blue: "#5b9dee",
-    blueBg: "#13314a",
+    blueBg: "#13243a",
   },
 };
 export default config;
