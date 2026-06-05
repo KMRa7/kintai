@@ -33,6 +33,7 @@ const PATHS = {
   chevL:    '<path d="M14.5 5L8 12l6.5 7"/>',
   chevR:    '<path d="M9.5 5L16 12l-6.5 7"/>',
   warn:     '<path d="M12 3.5L21 19H3L12 3.5Z"/><path d="M12 10v4"/><circle cx="12" cy="16.6" r="1"/>',
+  download: '<path d="M12 4v10M8 10.5l4 4 4-4"/><path d="M5 19.5h14"/>',
 };
 
 export function Icon({ name, size = 18, stroke = 1.6, style, className }) {
