@@ -7,7 +7,7 @@ const config = {
   storeLat: 34.9980,
   storeLng: 135.7780,
   storeRadiusM: 150,
-  storeAddress: "東山区日吉町",
+  storeAddress: "京都府京都市東山区日吉町228-1, 228-1 セブンハイツ",
   // —— 和モダン (warm washi, light) ——
   theme: {
     bg: "#f4ecde",          // washi 紙
