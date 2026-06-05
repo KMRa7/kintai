@@ -141,6 +141,17 @@ function LangToggle(){
   );
 }
 
+// viewport helper for responsive tweaks (no CSS file needed)
+function useNarrow(bp=560){
+  const [n,setN]=useState(typeof window!=="undefined" ? window.innerWidth<=bp : false);
+  useEffect(()=>{
+    const f=()=>setN(window.innerWidth<=bp);
+    window.addEventListener("resize",f);
+    return ()=>window.removeEventListener("resize",f);
+  },[bp]);
+  return n;
+}
+
 export default function App(){
   return (
     <I18nProvider>
@@ -151,6 +162,7 @@ export default function App(){
 
 function AppInner(){
   const {t}=useI18n();
+  const narrow=useNarrow();
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState("punch");
@@ -319,24 +331,24 @@ function AppInner(){
   return (
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:SANS,color:C.ink,WebkitFontSmoothing:"antialiased"}}>
       <link href={FONT_LINK} rel="stylesheet"/>
-      <header style={{background:C.paper,color:C.ink,padding:"12px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:C.shadow}}>
-        <div style={{display:"flex",alignItems:"center",gap:11}}>
+      <header style={{background:C.paper,color:C.ink,padding:narrow?"10px 12px":"12px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:C.shadow,gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:narrow?8:11,minWidth:0}}>
           {CONFIG.logoBase64
-            ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:36,height:36,objectFit:"contain",borderRadius:6}}/>
-            : <Seal size={36}/>
+            ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:narrow?30:36,height:narrow?30:36,objectFit:"contain",borderRadius:6,flexShrink:0}}/>
+            : <Seal size={narrow?30:36}/>
           }
-          <div>
-            <div style={{fontSize:14,fontWeight:600,letterSpacing:"0.1em",fontFamily:SERIF}}>{t("appName")}</div>
-            <div style={{fontSize:10,color:C.gold,letterSpacing:"0.16em"}}>{isAdmin?t("adminMode"):CONFIG.brandName}</div>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:narrow?12.5:14,fontWeight:600,letterSpacing:narrow?"0.04em":"0.1em",fontFamily:SERIF,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t("appName")}</div>
+            <div style={{fontSize:narrow?9:10,color:C.gold,letterSpacing:"0.14em",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{isAdmin?t("adminMode"):CONFIG.brandName}</div>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:11}}>
+        <div style={{display:"flex",alignItems:"center",gap:narrow?7:11,flexShrink:0}}>
           <LangToggle/>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:17,fontWeight:600,fontVariantNumeric:"tabular-nums",color:C.gold,letterSpacing:"0.04em",fontFamily:SERIF}}>{fmtHMS(now)}</div>
-            {!isAdmin&&<div style={{fontSize:10,color:C.muted}}>{currentUser?.name}</div>}
+            <div style={{fontSize:narrow?14:17,fontWeight:600,fontVariantNumeric:"tabular-nums",color:C.gold,letterSpacing:"0.04em",fontFamily:SERIF}}>{fmtHMS(now)}</div>
+            {!isAdmin&&!narrow&&<div style={{fontSize:10,color:C.muted}}>{currentUser?.name}</div>}
           </div>
-          <button onClick={handleLogout} style={{padding:"6px 12px",borderRadius:20,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:11,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}><Icon name="power" size={14}/>{t("logout")}</button>
+          <button onClick={handleLogout} title={t("logout")} style={{padding:narrow?"7px 9px":"6px 12px",borderRadius:20,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:11,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6,flexShrink:0}}><Icon name="power" size={14}/>{!narrow&&t("logout")}</button>
         </div>
       </header>
 
