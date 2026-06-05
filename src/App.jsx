@@ -79,6 +79,20 @@ function toMin(hhmm){ const[h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function minToHM(m){ const h=Math.floor(m/60), mm=m%60; return `${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; }
 function nameToAvatar(name){ return name.trim().charAt(0); }
 
+// —— CSV export (UTF-8 BOM so Sheets/Excel read Japanese correctly) ——
+function csvCell(v){ const s=String(v==null?"":v); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+function downloadCSV(filename, rows){
+  const csv = rows.map(r=>r.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function csvBtnStyle(){
+  return {padding:"7px 13px",borderRadius:8,border:`1px solid ${C.gold}`,background:"transparent",color:C.gold,fontFamily:SANS,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6,whiteSpace:"nowrap"};
+}
+
 function parseBreaks(raw){
   if(!raw) return [];
   try{ const a=typeof raw==="string"?JSON.parse(raw):raw; return Array.isArray(a)?a.filter(x=>Array.isArray(x)&&x.length===2):[]; }
@@ -745,6 +759,23 @@ function CompareView({staff,getShiftByDate,getAtt}){
   const monthDates=Array.from({length:new Date(year,month+1,0).getDate()},(_,i)=>new Date(year,month,i+1));
   if(!selStaff) return null;
   const brkTotal=breaksTotalMin(parseBreaks(selStaff.breaks));
+  function exportCSV(){
+    const DAYS=t.arr("daysSun");
+    const header=[t("h_date"),t("h_day"),t("h_shift")+"("+t("h_in")+")",t("h_shift")+"("+t("h_out")+")",t("h_in"),t("h_out"),t("csv_workedMin"),t("h_verdict")];
+    const rows=[header];
+    monthDates.forEach(d=>{
+      const sh=getShiftByDate(d,selStaff.id),att=getAtt(selStaff.id,d),vd=verdictOf(sh,att);
+      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,selStaff.breaks):0;
+      rows.push([
+        `${year}-${String(month+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`,
+        DAYS[d.getDay()],
+        sh?sh.start_time:"", sh?sh.end_time:"",
+        att?.clock_in?fmtHM(att.clock_in):"", att?.clock_out?fmtHM(att.clock_out):"",
+        mins, t("v_"+vd.vk),
+      ]);
+    });
+    downloadCSV(`kintai_${selStaff.username}_${year}-${String(month+1).padStart(2,"0")}.csv`, rows);
+  }
   return (
     <div>
       <SectionTitle icon="search" title={t("cmp_title")} sub={t("cmp_sub")}/>
@@ -752,7 +783,10 @@ function CompareView({staff,getShiftByDate,getAtt}){
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
         {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={chip(selStaff.id===s.id)}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
-      <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{t("breakLabel")}: <span style={{color:C.gold,fontWeight:700}}>{t("breakTotal",brkTotal)}</span></div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
+        <div style={{fontSize:11,color:C.muted}}>{t("breakLabel")}: <span style={{color:C.gold,fontWeight:700}}>{t("breakTotal",brkTotal)}</span></div>
+        <button onClick={exportCSV} style={csvBtnStyle()}><Icon name="download" size={14}/>{t("csv_export")}</button>
+      </div>
       <MonthTable staff={selStaff} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today}/>
     </div>
   );
@@ -862,7 +896,16 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
 
   return (
     <div>
-      <SectionTitle icon="yen" title={t("wage_title")} sub={t("wage_sub")}/>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+        <SectionTitle icon="yen" title={t("wage_title")} sub={t("wage_sub")}/>
+        <button onClick={()=>{
+          const header=[t("col_staff"),t("col_uname"),t("w_hourly"),t("csv_workedMin"),t("w_pay"),t("csv_breakMin")];
+          const rows=[header];
+          staff.forEach(s=>{ const sum=monthSummary(s); rows.push([s.name,s.username,s.wage||0,sum.mins,sum.pay,breaksTotalMin(parseBreaks(s.breaks))]); });
+          const ym=`${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,"0")}`;
+          downloadCSV(`kintai_wage_${ym}.csv`, rows);
+        }} style={{...csvBtnStyle(),marginTop:2,flexShrink:0}}><Icon name="download" size={14}/>{t("csv_export")}</button>
+      </div>
       <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
         <div style={{background:HEAD_BG,padding:"10px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
           <span>{t("col_staff")}</span><span style={{textAlign:"right"}}>{t("w_hourly")}</span><span style={{textAlign:"center"}}>{t("w_worked")}</span><span style={{textAlign:"right"}}>{t("w_pay")}</span><span style={{textAlign:"center"}}>{t("w_change")}</span>
