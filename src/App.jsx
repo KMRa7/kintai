@@ -41,8 +41,10 @@ const C = {
   blue: CONFIG.theme.blue,
   blueBg: CONFIG.theme.blueBg,
 };
-const ON_DARK = "#fffaf3";          // text on C.ink buttons
+const ON_DARK = "#fffaf3";          // text on C.ink buttons (light theme)
 const ON_GOLD = "#0a0a0a";          // text on gold/gold2 buttons
+const isDarkThemeEarly = (CONFIG.theme.bg || "").toLowerCase().match(/^#0|^#1/) ? true : false;
+const INK_TEXT = isDarkThemeEarly ? CONFIG.theme.bg : ON_DARK; // readable text on an "ink" surface in either theme
 const ROW_A = C.paper;
 const ROW_B = C.bg;
 const HEAD_BG = C.surface2;
@@ -339,7 +341,7 @@ function AppInner(){
       )}
 
       {toast&&(
-        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:toast.type==="ok"?C.ink:C.accent,color:ON_DARK,padding:"11px 26px",borderRadius:32,fontSize:13,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.28)",zIndex:999,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:8}}>
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:toast.type==="ok"?C.ink:C.accent,color:toast.type==="ok"?INK_TEXT:"#fff",padding:"11px 26px",borderRadius:32,fontSize:13,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.28)",zIndex:999,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:8}}>
           <Icon name={toast.type==="ok"?"check":"warn"} size={15}/>{toast.msg}
         </div>
       )}
@@ -1184,6 +1186,9 @@ function PB(kind){
   if(kind==="danger") return {...base,background:DANGER_BG,color:C.accent,border:`1px solid ${C.accent}`};
   if(kind==="ghost")  return {...base,background:C.bg,color:C.muted,border:`1px solid ${C.border}`};
   const onGoldBgs=[C.gold,C.gold2];
-  const color=onGoldBgs.includes(kind)?ON_GOLD:ON_DARK;
+  let color;
+  if(onGoldBgs.includes(kind)) color=ON_GOLD;
+  else if(kind===C.ink) color=INK_TEXT;   // ink button: dark text on dark theme, light text on light theme
+  else color=ON_DARK;
   return {...base,background:kind,color,border:"none"};
 }
