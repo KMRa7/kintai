@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import CONFIG from "@config";
 import { createClient } from "@supabase/supabase-js";
+import { Icon } from "./Icon";
+import { I18nProvider, useI18n } from "./i18n";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -14,8 +16,12 @@ const TIME_SLOTS = [
   "16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30",
   "20:00","20:30","21:00","21:30","22:00",
 ];
-const DAYS_JP = ["月","火","水","木","金","土","日"];
 const STORE_LAT = CONFIG.storeLat, STORE_LNG = CONFIG.storeLng, STORE_RADIUS_M = CONFIG.storeRadiusM;
+
+// —— type system (和モダン) ——
+const SERIF = "'Shippori Mincho','Hiragino Mincho ProN',serif";
+const SANS  = "'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif";
+const FONT_LINK = "https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap";
 
 const C = {
   bg: CONFIG.theme.bg,
@@ -35,37 +41,28 @@ const C = {
   blue: CONFIG.theme.blue,
   blueBg: CONFIG.theme.blueBg,
 };
-// ボタン等の上に乗る文字色（明るいテーマなら白、暗いテーマなら明色inkでも可）。inkの上に置く文字は反転色。
-const ON_DARK = "#fffaf3";          // C.ink（濃色）ボタンの上の文字
-const ON_GOLD = "#0a0a0a";          // gold/gold2ボタンの上の文字
-// 行縞・微妙な背景
+const ON_DARK = "#fffaf3";          // text on C.ink buttons
+const ON_GOLD = "#0a0a0a";          // text on gold/gold2 buttons
 const ROW_A = C.paper;
 const ROW_B = C.bg;
 const HEAD_BG = C.surface2;
 const HEAD_FG = C.muted;
-const SUBTLE = C.surface2;          // アバター背景など
-const FAINT = C.muted;              // 薄い文字（旧 #cbd5e1 等）
-// 判定バッジ（両テーマで視認できるトーン）
+const SUBTLE = C.surface2;
+const FAINT = C.muted;
+const isDarkTheme = (CONFIG.theme.bg || "").toLowerCase().match(/^#0|^#1/) ? true : false;
+const DANGER_BG = isDarkTheme ? "#2a0d0d" : "#f8e7e1";
+
+// verdict palette (theme-aware)
 const VD = {
-  holiday:  {bg:C.surface2, color:C.muted},
-  out:      {bg:C.blueBg,   color:C.blue},
-  absent:   {bg:"#fde8e6",  color:C.accent},
-  working:  {bg:C.greenBg,  color:C.green},
-  late:     {bg:"#fff4d6",  color:"#b8860b"},
-  early:    {bg:"#efe6ff",  color:"#7c5fd8"},
-  lateEarly:{bg:"#fde8e6",  color:C.accent},
-  normal:   {bg:C.greenBg,  color:C.green},
+  holiday:  { bg: C.surface2, color: C.muted },
+  out:      { bg: C.blueBg,   color: C.blue },
+  absent:   { bg: DANGER_BG,  color: C.accent },
+  working:  { bg: C.greenBg,  color: C.green },
+  late:     { bg: isDarkTheme ? "#241d0a" : "#f4ecd6", color: C.gold },
+  early:    { bg: isDarkTheme ? "#1c1630" : "#ece6f5", color: isDarkTheme ? "#b79cf0" : "#6e5aa0" },
+  lateEarly:{ bg: DANGER_BG,  color: C.accent },
+  normal:   { bg: C.greenBg,  color: C.green },
 };
-const isDarkTheme = (CONFIG.theme.bg||"").toLowerCase().match(/^#0|^#1/) ? true : false;
-// ダークテーマ用にバッジ背景を上書き
-if(isDarkTheme){
-  VD.holiday={bg:"#161616",color:"#777"};
-  VD.absent={bg:"#2a0d0d",color:C.accent};
-  VD.late={bg:"#1a1400",color:C.gold};
-  VD.early={bg:"#140d2a",color:"#9b7fe8"};
-  VD.lateEarly={bg:"#2a0d0d",color:C.accent};
-  VD.out={bg:"#0d1a2a",color:C.blue};
-}
 
 function getWeekDates(offset=0){
   const today=new Date(), mon=new Date(today);
@@ -107,7 +104,37 @@ function calcDistanceM(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// —— brand seal (replaces CONFIG.emoji) ——
+function Seal({size=34,radius=7}){
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:size,height:size,fontSize:Math.round(size*0.5),background:C.accent,color:"#fff",borderRadius:radius,fontFamily:SERIF,fontWeight:600,lineHeight:1,boxShadow:"inset 0 0 0 1.5px rgba(255,255,255,0.22)",flexShrink:0}}>勤</span>
+  );
+}
+function LangToggle(){
+  const {lang,setLang}=useI18n();
+  return (
+    <div style={{display:"inline-flex",alignItems:"center",gap:5,border:`1px solid ${C.border}`,borderRadius:20,padding:"3px 5px 3px 8px"}}>
+      <Icon name="globe" size={13} style={{color:C.muted}}/>
+      {["ja","en"].map(l=>(
+        <button key={l} onClick={()=>setLang(l)}
+          style={{border:"none",background:lang===l?C.accent:"transparent",color:lang===l?"#fff":C.muted,borderRadius:13,padding:"3px 9px",cursor:"pointer",fontFamily:SANS,fontWeight:700,fontSize:11}}>
+          {l==="ja"?"日":"EN"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App(){
+  return (
+    <I18nProvider>
+      <AppInner/>
+    </I18nProvider>
+  );
+}
+
+function AppInner(){
+  const {t}=useI18n();
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState("punch");
@@ -119,7 +146,7 @@ export default function App(){
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  useEffect(()=>{ const t=setInterval(()=>setNow(new Date()),1000); return ()=>clearInterval(t); },[]);
+  useEffect(()=>{ const tm=setInterval(()=>setNow(new Date()),1000); return ()=>clearInterval(tm); },[]);
 
   const loadAll = useCallback(async()=>{
     setLoading(true);
@@ -160,7 +187,7 @@ export default function App(){
       const {data}=await supabase.from("shifts").insert({staff_id:staffId,date:ds,start_time:startTime,end_time:endTime}).select().single();
       if(data) setShifts(p=>[...p,data]);
     }
-    showToast("📅 シフトを保存しました");
+    showToast(t("t_shiftSaved"));
   }
   async function deleteShift(staffId,date){
     const ds=toDateStr(date);
@@ -168,7 +195,7 @@ export default function App(){
     if(!existing) return;
     await supabase.from("shifts").delete().eq("id",existing.id);
     setShifts(p=>p.filter(s=>s.id!==existing.id));
-    showToast("🗑 シフトを削除しました");
+    showToast(t("t_shiftDeleted"));
   }
 
   function getAtt(staffId,date){
@@ -186,7 +213,7 @@ export default function App(){
       const {data}=await supabase.from("attendance").insert({staff_id:staffId,date:ds,clock_in:ts}).select().single();
       if(data) setAttendance(p=>[...p,data]);
     }
-    showToast("🍜 出勤打刻しました！");
+    showToast(t("t_punchedIn"));
   }
   async function punchOut(staffId){
     const today=new Date(), ds=toDateStr(today);
@@ -199,7 +226,7 @@ export default function App(){
       const {data}=await supabase.from("attendance").insert({staff_id:staffId,date:ds,clock_out:ts}).select().single();
       if(data) setAttendance(p=>[...p,data]);
     }
-    showToast("👋 退勤打刻しました！");
+    showToast(t("t_punchedOut"));
   }
 
   async function editAttendance(staffId,dateStr,field,timeStr){
@@ -228,42 +255,43 @@ export default function App(){
 
   async function addStaff(name,username,password,wage,breaks){
     const {data}=await supabase.from("staff").insert({name,username,password,wage,breaks:JSON.stringify(breaks||[])}).select().single();
-    if(data){ setStaff(p=>[...p,data]); showToast(`✅ ${name} のアカウントを発行しました`); }
+    if(data){ setStaff(p=>[...p,data]); showToast(t("t_accIssued",name)); }
   }
   async function deleteStaff(id){
     await supabase.from("staff").delete().eq("id",id);
     setStaff(p=>p.filter(s=>s.id!==id));
-    showToast("🗑 アカウントを削除しました");
+    showToast(t("t_accDeleted"));
   }
   async function updateStaff(id,fields){
     const payload={...fields};
     if(payload.breaks!==undefined) payload.breaks=JSON.stringify(payload.breaks||[]);
     const {data}=await supabase.from("staff").update(payload).eq("id",id).select().single();
-    if(data){ setStaff(p=>p.map(s=>s.id===id?data:s)); showToast("✅ アカウントを更新しました"); }
+    if(data){ setStaff(p=>p.map(s=>s.id===id?data:s)); showToast(t("t_accUpdated")); }
   }
 
   async function addTemplate(name,breaks){
     const {data}=await supabase.from("break_templates").insert({name,breaks:JSON.stringify(breaks||[])}).select().single();
-    if(data){ setTemplates(p=>[...p,data]); showToast(`✅ テンプレ「${name}」を作成しました`); }
+    if(data){ setTemplates(p=>[...p,data]); showToast(t("t_tplCreated",name)); }
   }
   async function updateTemplate(id,name,breaks){
     const {data}=await supabase.from("break_templates").update({name,breaks:JSON.stringify(breaks||[])}).eq("id",id).select().single();
-    if(data){ setTemplates(p=>p.map(t=>t.id===id?data:t)); showToast("✅ テンプレを更新しました"); }
+    if(data){ setTemplates(p=>p.map(x=>x.id===id?data:x)); showToast(t("t_tplUpdated")); }
   }
   async function deleteTemplate(id){
     await supabase.from("break_templates").delete().eq("id",id);
-    setTemplates(p=>p.filter(t=>t.id!==id));
-    showToast("🗑 テンプレを削除しました");
+    setTemplates(p=>p.filter(x=>x.id!==id));
+    showToast(t("t_tplDeleted"));
   }
 
   if(loading && staff.length===0){
     return (
-      <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,fontFamily:SANS}}>
+        <link href={FONT_LINK} rel="stylesheet"/>
         {CONFIG.logoBase64
           ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:48,height:48,objectFit:"contain"}}/>
-          : <div style={{fontSize:36}}>{CONFIG.emoji}</div>
+          : <Seal size={48} radius={10}/>
         }
-        <div style={{fontSize:14,color:C.muted}}>読み込み中...</div>
+        <div style={{fontSize:14,color:C.muted}}>{t("loading")}</div>
       </div>
     );
   }
@@ -273,25 +301,26 @@ export default function App(){
   }
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif",color:C.ink}}>
-      <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
-      <header style={{background:C.paper,color:C.ink,padding:"14px 18px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:C.shadow}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:SANS,color:C.ink,WebkitFontSmoothing:"antialiased"}}>
+      <link href={FONT_LINK} rel="stylesheet"/>
+      <header style={{background:C.paper,color:C.ink,padding:"12px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:C.shadow}}>
+        <div style={{display:"flex",alignItems:"center",gap:11}}>
           {CONFIG.logoBase64
             ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:36,height:36,objectFit:"contain",borderRadius:6}}/>
-            : <span style={{fontSize:22}}>{CONFIG.emoji}</span>
+            : <Seal size={36}/>
           }
           <div>
-            <div style={{fontSize:14,fontWeight:700,letterSpacing:"0.08em"}}>勤怠管理システム</div>
-            <div style={{fontSize:10,color:C.gold,letterSpacing:"0.12em"}}>{isAdmin?"管理者モード":CONFIG.brandName}</div>
+            <div style={{fontSize:14,fontWeight:600,letterSpacing:"0.1em",fontFamily:SERIF}}>{t("appName")}</div>
+            <div style={{fontSize:10,color:C.gold,letterSpacing:"0.16em"}}>{isAdmin?t("adminMode"):CONFIG.brandName}</div>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:11}}>
+          <LangToggle/>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:16,fontWeight:700,fontVariantNumeric:"tabular-nums",color:C.gold,letterSpacing:"0.05em"}}>{fmtHMS(now)}</div>
+            <div style={{fontSize:17,fontWeight:600,fontVariantNumeric:"tabular-nums",color:C.gold,letterSpacing:"0.04em",fontFamily:SERIF}}>{fmtHMS(now)}</div>
             {!isAdmin&&<div style={{fontSize:10,color:C.muted}}>{currentUser?.name}</div>}
           </div>
-          <button onClick={handleLogout} style={{padding:"6px 12px",borderRadius:16,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:11,fontWeight:700,cursor:"pointer"}}>🔒 ログアウト</button>
+          <button onClick={handleLogout} style={{padding:"6px 12px",borderRadius:20,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:11,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}><Icon name="power" size={14}/>{t("logout")}</button>
         </div>
       </header>
 
@@ -310,8 +339,8 @@ export default function App(){
       )}
 
       {toast&&(
-        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:toast.type==="ok"?C.ink:C.accent,color:ON_DARK,padding:"11px 26px",borderRadius:32,fontSize:13,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.28)",zIndex:999,whiteSpace:"nowrap"}}>
-          {toast.msg}
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:toast.type==="ok"?C.ink:C.accent,color:ON_DARK,padding:"11px 26px",borderRadius:32,fontSize:13,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.28)",zIndex:999,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:8}}>
+          <Icon name={toast.type==="ok"?"check":"warn"} size={15}/>{toast.msg}
         </div>
       )}
     </div>
@@ -319,6 +348,7 @@ export default function App(){
 }
 
 function LoginPage({onSuccess,staff}){
+  const {t}=useI18n();
   const [username,setUsername]=useState("");
   const [password,setPassword]=useState("");
   const [error,setError]=useState("");
@@ -332,47 +362,48 @@ function LoginPage({onSuccess,staff}){
     const found=staff.find(s=>s.username===username&&s.password===password);
     if(found){ onSuccess(found,false); return; }
     const next=attempts+1; setAttempts(next);
-    setError(next>=5?"試行回数が上限に達しました。ページを再読み込みしてください。":`ユーザー名またはパスワードが違います（${next}回失敗）`);
+    setError(next>=5?t("loginLocked"):t("loginFail",next));
     setPassword("");
   }
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Noto Serif JP','Hiragino Mincho ProN',serif"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:SANS,position:"relative"}}>
+      <link href={FONT_LINK} rel="stylesheet"/>
+      <div style={{position:"absolute",top:18,right:18}}><LangToggle/></div>
       <div style={{marginBottom:28,textAlign:"center"}}>
         {CONFIG.logoWideBase64
           ? <img src={CONFIG.logoWideBase64} alt={CONFIG.brandName} style={{maxWidth:200,height:"auto",objectFit:"contain",marginBottom:12}}/>
           : CONFIG.logoBase64
             ? <img src={CONFIG.logoBase64} alt={CONFIG.brandName} style={{width:64,height:64,objectFit:"contain",marginBottom:8}}/>
-            : <div style={{fontSize:42,marginBottom:8}}>{CONFIG.emoji}</div>
+            : <div style={{marginBottom:14}}><Seal size={62} radius={12}/></div>
         }
-        <div style={{fontSize:20,fontWeight:700,color:C.ink,letterSpacing:"0.08em"}}>勤怠管理システム</div>
-        <div style={{fontSize:11,color:C.gold,letterSpacing:"0.14em",marginTop:3}}>{CONFIG.brandName}</div>
+        <div style={{fontSize:20,fontWeight:600,color:C.ink,letterSpacing:"0.1em",fontFamily:SERIF}}>{t("appName")}</div>
+        <div style={{fontSize:11,color:C.gold,letterSpacing:"0.16em",marginTop:4}}>{CONFIG.brandName}</div>
       </div>
-      <div style={{background:C.paper,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:360,boxShadow:C.shadow}}>
-        <div style={{fontSize:15,fontWeight:700,marginBottom:20}}>ログイン</div>
+      <div style={{background:C.paper,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:360,boxShadow:C.shadow,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:15,fontWeight:600,marginBottom:20,fontFamily:SERIF}}>{t("login")}</div>
         <div style={{marginBottom:14}}>
-          <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5}}>ユーザー名</label>
+          <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("username")}</label>
           <input type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}}
             onKeyDown={e=>e.key==="Enter"&&document.getElementById("pw-input").focus()}
-            placeholder="例: tanaka / admin" disabled={locked}
-            style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+            placeholder={t("usernamePh")} disabled={locked}
+            style={{width:"100%",padding:"11px 12px",borderRadius:9,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:SANS,fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
         </div>
         <div style={{marginBottom:20}}>
-          <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5}}>パスワード</label>
+          <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("password")}</label>
           <div style={{position:"relative"}}>
             <input id="pw-input" type={showPw?"text":"password"} value={password}
               onChange={e=>{setPassword(e.target.value);setError("");}}
               onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="パスワード" disabled={locked}
-              style={{width:"100%",padding:"11px 40px 11px 12px",borderRadius:10,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:"inherit",fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
-            <button onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted}}>{showPw?"🙈":"👁"}</button>
+              placeholder={t("passwordPh")} disabled={locked}
+              style={{width:"100%",padding:"11px 40px 11px 12px",borderRadius:9,border:`1.5px solid ${error?C.accent:C.border}`,background:C.bg,fontFamily:SANS,fontSize:14,color:C.ink,outline:"none",boxSizing:"border-box",caretColor:C.gold,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+            <button onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,display:"inline-flex"}}><Icon name={showPw?"eyeOff":"eye"} size={18}/></button>
           </div>
         </div>
-        {error&&<div style={{fontSize:12,color:C.accent,fontWeight:600,marginBottom:14,padding:"8px 12px",background:isDarkTheme?"#2a0d0d":"#fde8e6",borderRadius:8}}>{locked?"🚫 ":"❌ "}{error}</div>}
+        {error&&<div style={{fontSize:12,color:C.accent,fontWeight:600,marginBottom:14,padding:"8px 12px",background:DANGER_BG,borderRadius:8,display:"flex",alignItems:"center",gap:7}}><Icon name={locked?"lock":"x"} size={14}/>{error}</div>}
         <button onClick={handleLogin} disabled={!username||!password||locked}
-          style={{width:"100%",padding:13,borderRadius:10,border:"none",background:!username||!password||locked?C.surface2:C.gold,color:!username||!password||locked?C.muted:ON_GOLD,fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer"}}>
-          ログイン
+          style={{width:"100%",padding:13,borderRadius:10,border:"none",background:!username||!password||locked?C.surface2:C.gold,color:!username||!password||locked?C.muted:ON_GOLD,fontFamily:SANS,fontSize:14,fontWeight:700,cursor:!username||!password||locked?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <Icon name="arrowR" size={16}/>{t("login")}
         </button>
       </div>
     </div>
@@ -380,12 +411,13 @@ function LoginPage({onSuccess,staff}){
 }
 
 function UserLayout({tab,setTab,currentUser,now,getAtt,punchIn,punchOut,getShiftByDate,attendance}){
-  const tabStyle=(active)=>({flex:1,padding:"11px 4px 9px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`3px solid ${C.accent}`:"3px solid transparent",color:active?C.accent:C.muted,fontFamily:"inherit",fontSize:11,fontWeight:active?700:400});
+  const {t}=useI18n();
+  const tabStyle=(active)=>({flex:1,padding:"11px 4px 9px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`2.5px solid ${C.accent}`:"2.5px solid transparent",color:active?C.accent:C.muted,fontFamily:SANS,fontSize:11,fontWeight:active?700:500,display:"flex",flexDirection:"column",alignItems:"center",gap:4});
   return (
     <>
-      <nav style={{display:"flex",background:C.surface2,borderBottom:`2px solid ${C.border}`}}>
-        <button onClick={()=>setTab("punch")} style={tabStyle(tab==="punch")}><div style={{fontSize:16}}>⏱</div>打刻</button>
-        <button onClick={()=>setTab("record")} style={tabStyle(tab==="record")}><div style={{fontSize:16}}>📊</div>勤務実績</button>
+      <nav style={{display:"flex",background:C.surface2,borderBottom:`1px solid ${C.border}`}}>
+        <button onClick={()=>setTab("punch")} style={tabStyle(tab==="punch")}><Icon name="clock" size={18}/>{t("tab_punch")}</button>
+        <button onClick={()=>setTab("record")} style={tabStyle(tab==="record")}><Icon name="chart" size={18}/>{t("tab_record")}</button>
       </nav>
       <main style={{maxWidth:820,margin:"0 auto",padding:"18px 14px 60px"}}>
         {tab==="punch" && <PunchView staff={[currentUser]} now={now} getAtt={getAtt} punchIn={punchIn} punchOut={punchOut} getShiftByDate={getShiftByDate} singleUser={true}/>}
@@ -396,20 +428,21 @@ function UserLayout({tab,setTab,currentUser,now,getAtt,punchIn,punchOut,getShift
 }
 
 function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,attendance,getAtt,punchIn,punchOut,editAttendance,clearAttendanceDay,addStaff,deleteStaff,updateStaff,templates,addTemplate,updateTemplate,deleteTemplate,showToast,now}){
+  const {t}=useI18n();
   const TABS=[
-    {id:"shift",icon:"📅",label:"シフト入力"},
-    {id:"punch",icon:"⏱",label:"打刻"},
-    {id:"compare",icon:"🔍",label:"照合"},
-    {id:"edit",icon:"✏️",label:"勤怠修正"},
-    {id:"wage",icon:"💴",label:"時給設定"},
-    {id:"breaks",icon:"☕",label:"休憩テンプレ"},
-    {id:"accounts",icon:"👤",label:"アカウント"},
+    {id:"shift",icon:"calendar",label:t("tab_shift")},
+    {id:"punch",icon:"clock",label:t("tab_punch")},
+    {id:"compare",icon:"search",label:t("tab_compare")},
+    {id:"edit",icon:"pencil",label:t("tab_edit")},
+    {id:"wage",icon:"yen",label:t("tab_wage")},
+    {id:"breaks",icon:"coffee",label:t("tab_breaks")},
+    {id:"accounts",icon:"users",label:t("tab_accounts")},
   ];
-  const tabStyle=(active)=>({flex:1,padding:"10px 2px 8px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`3px solid ${C.accent}`:"3px solid transparent",color:active?C.accent:C.muted,fontFamily:"inherit",fontSize:10,fontWeight:active?700:400,whiteSpace:"nowrap"});
+  const tabStyle=(active)=>({flex:1,padding:"10px 2px 8px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`2.5px solid ${C.accent}`:"2.5px solid transparent",color:active?C.accent:C.muted,fontFamily:SANS,fontSize:10,fontWeight:active?700:500,whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:3});
   return (
     <>
-      <nav style={{display:"flex",background:C.surface2,borderBottom:`2px solid ${C.border}`,overflowX:"auto"}}>
-        {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={tabStyle(tab===t.id)}><div style={{fontSize:14}}>{t.icon}</div>{t.label}</button>)}
+      <nav style={{display:"flex",background:C.surface2,borderBottom:`1px solid ${C.border}`,overflowX:"auto"}}>
+        {TABS.map(tt=><button key={tt.id} onClick={()=>setTab(tt.id)} style={tabStyle(tab===tt.id)}><Icon name={tt.icon} size={16}/>{tt.label}</button>)}
       </nav>
       <main style={{maxWidth:900,margin:"0 auto",padding:"18px 14px 60px"}}>
         {tab==="shift"    && <ShiftInputView staff={staff} getShiftByDate={getShiftByDate} saveShift={saveShift} deleteShift={deleteShift}/>}
@@ -424,22 +457,24 @@ function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,atte
   );
 }
 
+// verdict → { vk, bg, color }. Label resolved with t("v_"+vk) at render.
 function verdictOf(sh,att){
-  if(!sh&&!att?.clock_in) return {label:"休日",...VD.holiday};
-  if(!sh&& att?.clock_in) return {label:"シフト外",...VD.out};
-  if( sh&&!att?.clock_in) return {label:"欠勤",...VD.absent};
-  if(!att?.clock_out)     return {label:"勤務中",...VD.working};
+  if(!sh&&!att?.clock_in) return {vk:"holiday",...VD.holiday};
+  if(!sh&& att?.clock_in) return {vk:"out",...VD.out};
+  if( sh&&!att?.clock_in) return {vk:"absent",...VD.absent};
+  if(!att?.clock_out)     return {vk:"working",...VD.working};
   const aIn=new Date(att.clock_in),aOut=new Date(att.clock_out);
   const aInM=aIn.getHours()*60+aIn.getMinutes(),aOutM=aOut.getHours()*60+aOut.getMinutes();
   const late=aInM>toMin(sh.start_time)+5,early=aOutM<toMin(sh.end_time)-5;
-  if(late&&early) return {label:"遅刻・早退",...VD.lateEarly};
-  if(late)        return {label:"遅刻",...VD.late};
-  if(early)       return {label:"早退",...VD.early};
-  return              {label:"正常",...VD.normal};
+  if(late&&early) return {vk:"lateEarly",...VD.lateEarly};
+  if(late)        return {vk:"late",...VD.late};
+  if(early)       return {vk:"early",...VD.early};
+  return              {vk:"normal",...VD.normal};
 }
 
 function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today}){
-  const DAYS_JA=["日","月","火","水","木","金","土"];
+  const {t}=useI18n();
+  const DAYS=t.arr("daysSun");
   const monthTotal=monthDates.reduce((acc,d)=>{
     const sh=getShiftByDate(d,s.id),att=getAtt(s.id,d);
     const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.breaks):0;
@@ -448,17 +483,17 @@ function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today})
   return (
     <>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
-        {[["出勤日数",`${monthDates.filter(d=>{const a=getAtt(s.id,d);return a?.clock_in&&a?.clock_out;}).length}日`,C.green],["総勤務時間",`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],["合計給与",`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
-          <div key={label} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 8px",textAlign:"center"}}>
-            <div style={{fontSize:10,color:C.muted,marginBottom:3}}>{label}</div>
-            <div style={{fontSize:16,fontWeight:700,color}}>{val}</div>
+        {[[t("s_days"),`${monthDates.filter(d=>{const a=getAtt(s.id,d);return a?.clock_in&&a?.clock_out;}).length}${t("dUnit")}`,C.green],[t("s_hours"),`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],[t("s_pay"),`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
+          <div key={label} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:11,padding:"11px 8px",textAlign:"center"}}>
+            <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{label}</div>
+            <div style={{fontSize:18,fontWeight:600,color,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>{val}</div>
           </div>
         ))}
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:440}}>
           <thead><tr style={{background:HEAD_BG,color:HEAD_FG}}>
-            {["日付","曜","シフト","出勤","退勤","実働","判定"].map(h=><th key={h} style={{padding:"9px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
+            {[t("h_date"),t("h_day"),t("h_shift"),t("h_in"),t("h_out"),t("h_worked"),t("h_verdict")].map((h,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",fontSize:11,whiteSpace:"nowrap",fontWeight:700}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {monthDates.map((d,i)=>{
@@ -467,21 +502,21 @@ function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today})
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
                 <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?C.surface2:i%2===0?ROW_A:ROW_B}}>
-                  <td style={{padding:"7px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,whiteSpace:"nowrap"}}>{month+1}/{d.getDate()}{isToday&&" ✦"}</td>
-                  <td style={{padding:"7px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center",color:sh?C.green:FAINT,whiteSpace:"nowrap"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_in?<span style={{color:C.blue}}>{fmtHM(att.clock_in)}</span>:<span style={{color:FAINT}}>──</span>}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center"}}>{att?.clock_out?<span style={{color:C.accent}}>{fmtHM(att.clock_out)}</span>:<span style={{color:FAINT}}>──</span>}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center",fontWeight:700,color:mins>0?C.ink:FAINT}}>{mins>0?`${Math.floor(mins/60)}h${mins%60}m`:"──"}</td>
-                  <td style={{padding:"7px 6px",textAlign:"center"}}><span style={{fontSize:10,padding:"2px 6px",borderRadius:8,background:vd.bg,color:vd.color,fontWeight:700,whiteSpace:"nowrap"}}>{vd.label}</span></td>
+                  <td style={{padding:"8px 6px",textAlign:"center",fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,whiteSpace:"nowrap",fontVariantNumeric:"tabular-nums"}}>{t("md",month,d.getDate())}{isToday&&" ✦"}</td>
+                  <td style={{padding:"8px 4px",textAlign:"center",color:isWE?C.accent:C.muted,fontWeight:600}}>{DAYS[d.getDay()]}</td>
+                  <td style={{padding:"8px 6px",textAlign:"center",color:sh?C.green:FAINT,whiteSpace:"nowrap",fontVariantNumeric:"tabular-nums"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</td>
+                  <td style={{padding:"8px 6px",textAlign:"center",fontVariantNumeric:"tabular-nums"}}>{att?.clock_in?<span style={{color:C.blue}}>{fmtHM(att.clock_in)}</span>:<span style={{color:FAINT}}>──</span>}</td>
+                  <td style={{padding:"8px 6px",textAlign:"center",fontVariantNumeric:"tabular-nums"}}>{att?.clock_out?<span style={{color:C.accent}}>{fmtHM(att.clock_out)}</span>:<span style={{color:FAINT}}>──</span>}</td>
+                  <td style={{padding:"8px 6px",textAlign:"center",fontWeight:700,color:mins>0?C.ink:FAINT,fontVariantNumeric:"tabular-nums"}}>{mins>0?`${Math.floor(mins/60)}h${mins%60}m`:"──"}</td>
+                  <td style={{padding:"8px 6px",textAlign:"center"}}><span style={{fontSize:10,padding:"3px 8px",borderRadius:20,background:vd.bg,color:vd.color,fontWeight:700,whiteSpace:"nowrap"}}>{t("v_"+vd.vk)}</span></td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot><tr style={{background:HEAD_BG,color:HEAD_FG}}>
-            <td colSpan={5} style={{padding:"10px 12px",fontWeight:700,fontSize:12}}>月合計</td>
-            <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
-            <td style={{padding:"10px 6px",textAlign:"center",color:C.gold,fontWeight:700}}>¥{monthTotal.pay.toLocaleString()}</td>
+            <td colSpan={5} style={{padding:"11px 12px",fontWeight:700,fontSize:12}}>{t("s_monthTotal")}</td>
+            <td style={{padding:"11px 6px",textAlign:"center",color:C.gold,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
+            <td style={{padding:"11px 6px",textAlign:"center",color:C.gold,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>¥{monthTotal.pay.toLocaleString()}</td>
           </tr></tfoot>
         </table>
       </div>
@@ -490,6 +525,7 @@ function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today})
 }
 
 function MyRecordView({currentUser,getAtt,getShiftByDate}){
+  const {t}=useI18n();
   const [moOffset,setMoOffset]=useState(0);
   const today=new Date();
   const base=new Date(today.getFullYear(),today.getMonth()+moOffset,1);
@@ -499,7 +535,7 @@ function MyRecordView({currentUser,getAtt,getShiftByDate}){
   const brkTotal=breaksTotalMin(parseBreaks(s.breaks));
   return (
     <div>
-      <SectionTitle icon="📊" title="勤務実績" sub={`自分のシフトと打刻の記録（休憩計${brkTotal}分）`}/>
+      <SectionTitle icon="chart" title={t("rec_title")} sub={t("rec_sub",brkTotal)}/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <MonthTable staff={s} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today}/>
     </div>
@@ -507,6 +543,8 @@ function MyRecordView({currentUser,getAtt,getShiftByDate}){
 }
 
 function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
+  const {t}=useI18n();
+  const DAYS=t.arr("days");
   const [weekOffset,setWeekOffset]=useState(0);
   const [modal,setModal]=useState(null);
   const [editVal,setEditVal]=useState({start:"10:00",end:"18:00"});
@@ -531,19 +569,19 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
 
   return (
     <div>
-      <SectionTitle icon="📅" title="シフト入力" sub="週ごとにスタッフのシフトを入力してください"/>
+      <SectionTitle icon="calendar" title={t("shift_title")} sub={t("shift_sub")}/>
       <WeekNav dates={dates} offset={weekOffset} setOffset={setWeekOffset}/>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:560}}>
           <thead><tr style={{background:HEAD_BG,color:HEAD_FG}}>
-            <th style={{padding:"10px 12px",textAlign:"left",width:88}}>スタッフ</th>
-            {dates.map((d,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",color:i>=5?C.gold:HEAD_FG,minWidth:70}}><div>{DAYS_JP[i]}</div><div style={{fontSize:10,opacity:0.7}}>{fmtDate(d)}</div></th>)}
+            <th style={{padding:"10px 12px",textAlign:"left",width:88,fontWeight:700}}>{t("col_staff")}</th>
+            {dates.map((d,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",color:i>=5?C.gold:HEAD_FG,minWidth:70,fontWeight:700}}><div>{DAYS[i]}</div><div style={{fontSize:10,opacity:0.7,fontWeight:400}}>{fmtDate(d)}</div></th>)}
           </tr></thead>
           <tbody>
             {staff.map((s,si)=>(
               <tr key={s.id} style={{borderBottom:`1px solid ${C.border}`,background:si%2===0?ROW_A:ROW_B}}>
                 <td style={{padding:"10px",fontWeight:700}}>
-                  <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:"50%",background:SUBTLE,color:C.muted,fontSize:11,fontWeight:700,marginRight:5}}>{nameToAvatar(s.name)}</span>
+                  <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:"50%",background:SUBTLE,color:C.muted,fontSize:11,fontWeight:600,marginRight:6,fontFamily:SERIF}}>{nameToAvatar(s.name)}</span>
                   {s.name.split(" ")[0]}
                 </td>
                 {dates.map((_,dayIdx)=>{
@@ -551,11 +589,11 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
                   return (
                     <td key={dayIdx} style={{padding:"5px 4px",textAlign:"center"}}>
                       {sh?(
-                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"5px 2px",borderRadius:8,border:`1px solid ${C.greenBorder}`,background:C.greenBg,color:C.green,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",lineHeight:1.5}}>
+                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"6px 2px",borderRadius:8,border:`1px solid ${C.greenBorder}`,background:C.greenBg,color:C.green,fontSize:10.5,fontWeight:700,cursor:"pointer",fontFamily:SANS,lineHeight:1.5,fontVariantNumeric:"tabular-nums"}}>
                           {sh.start_time}<br/>〜{sh.end_time}
                         </button>
                       ):(
-                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"13px 0",border:`1.5px dashed ${C.border}`,borderRadius:8,background:"transparent",color:C.muted,fontSize:18,cursor:"pointer"}}>+</button>
+                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"12px 0",border:`1.5px dashed ${C.border}`,borderRadius:8,background:"transparent",color:C.muted,cursor:"pointer",display:"inline-flex",justifyContent:"center"}}><Icon name="plus" size={15}/></button>
                       )}
                     </td>
                   );
@@ -567,14 +605,14 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
       </div>
       {modal&&(
         <Modal onClose={()=>setModal(null)}>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{staff.find(s=>s.id===modal.staffId)?.name}</div>
-          <div style={{fontSize:12,color:C.muted,marginBottom:18}}>{DAYS_JP[modal.dayIdx]}曜日（{fmtDate(dates[modal.dayIdx])}）</div>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:3,fontFamily:SERIF}}>{staff.find(s=>s.id===modal.staffId)?.name}</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:18}}>{DAYS[modal.dayIdx]}{t("dowSuffix")}（{fmtDate(dates[modal.dayIdx])}）</div>
           <div style={{display:"flex",gap:12,marginBottom:20}}>
-            <label style={LS}>出勤時刻<select value={editVal.start} onChange={e=>setEditVal(v=>({...v,start:e.target.value}))} style={SS}>{TIME_SLOTS.map(t=><option key={t}>{t}</option>)}</select></label>
-            <label style={LS}>退勤時刻<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS.map(t=><option key={t}>{t}</option>)}</select></label>
+            <label style={LS}>{t("inTime")}<select value={editVal.start} onChange={e=>setEditVal(v=>({...v,start:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
+            <label style={LS}>{t("outTime")}<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
           </div>
-          <button onClick={save} disabled={saving} style={PB(C.ink)}>{saving?"保存中...":"💾 保存する"}</button>
-          {getShiftByDate(dates[modal.dayIdx],modal.staffId)&&<button onClick={remove} disabled={saving} style={{...PB("danger"),marginTop:8}}>🗑 削除する</button>}
+          <button onClick={save} disabled={saving} style={PB(C.ink)}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
+          {getShiftByDate(dates[modal.dayIdx],modal.staffId)&&<button onClick={remove} disabled={saving} style={{...PB("danger"),marginTop:8}}><Icon name="trash" size={15}/>{t("del")}</button>}
         </Modal>
       )}
     </div>
@@ -582,6 +620,7 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
 }
 
 function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}){
+  const {t}=useI18n();
   const [selected,setSelected]=useState(singleUser?staff[0]:null);
   const [gps,setGps]=useState("idle");
   const [gpsMsg,setGpsMsg]=useState("");
@@ -598,41 +637,44 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
       setPunching(false);
       return;
     }
-    setGps("checking"); setGpsMsg("位置情報を確認中...");
-    if(!navigator.geolocation){ setGps("error"); setGpsMsg("GPSに対応していません"); return; }
+    setGps("checking"); setGpsMsg(t("gps_checking"));
+    if(!navigator.geolocation){ setGps("error"); setGpsMsg(t("gps_noSupport")); return; }
     navigator.geolocation.getCurrentPosition(
       async pos=>{
         const dist=calcDistanceM(pos.coords.latitude,pos.coords.longitude,STORE_LAT,STORE_LNG);
         if(dist<=STORE_RADIUS_M){
-          setGps("ok"); setGpsMsg(`店舗から約${Math.round(dist)}m — 打刻OK`);
+          setGps("ok"); setGpsMsg(t("gps_ok",Math.round(dist)));
           setPunching(true);
           type==="in"?await punchIn(selected.id):await punchOut(selected.id);
           setPunching(false);
-        } else { setGps("error"); setGpsMsg(`店舗から約${Math.round(dist)}m離れています（許容: ${STORE_RADIUS_M}m以内）`); }
+        } else { setGps("error"); setGpsMsg(t("gps_far",Math.round(dist),STORE_RADIUS_M)); }
       },
-      ()=>{ setGps("denied"); setGpsMsg("位置情報が拒否されました。"); },
+      ()=>{ setGps("denied"); setGpsMsg(t("gps_denied")); },
       {enableHighAccuracy:true,timeout:10000}
     );
   }
 
-  const SL={absent:"未出勤",working:"勤務中",done:"退勤済"};
+  const SL={absent:t("st_absent"),working:t("st_working"),done:t("st_done")};
   const SC={absent:C.muted,working:C.green,done:C.blue};
   const SB={absent:C.surface2,working:C.greenBg,done:C.blueBg};
   const canIn=!att?.clock_in&&gps!=="checking"&&!punching;
   const canOut=att?.clock_in&&!att?.clock_out&&gps!=="checking"&&!punching;
+  const gpsIcon = gps==="checking"?"signal":gps==="ok"?"pin":"x";
+  const gpsColor = gps==="ok"?C.green:gps==="checking"?C.gold:C.accent;
+  const gpsBg = gps==="ok"?C.greenBg:gps==="checking"?C.surface2:DANGER_BG;
 
   return (
     <div>
-      <SectionTitle icon="⏱" title="出退勤 打刻" sub={singleUser?"打刻ボタンを押してください":"スタッフを選んで打刻してください"}/>
+      <SectionTitle icon="clock" title={t("punch_title")} sub={singleUser?t("punch_subOne"):t("punch_subMany")}/>
       {!singleUser&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(118px,1fr))",gap:10,marginBottom:22}}>
           {staff.map(s=>{
             const a=getAtt(s.id,today),st=!a?.clock_in?"absent":!a?.clock_out?"working":"done",isSel=selected?.id===s.id;
             return (
-              <button key={s.id} onClick={()=>{setSelected(s);setGps("idle");setGpsMsg("");}} style={{background:isSel?C.gold:C.paper,border:`2px solid ${isSel?C.gold:C.border}`,borderRadius:14,padding:"12px 8px",cursor:"pointer",textAlign:"center",boxShadow:C.shadow}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:isSel?ON_GOLD:SUBTLE,color:isSel?C.gold:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,margin:"0 auto 7px"}}>{nameToAvatar(s.name)}</div>
-                <div style={{fontSize:12,fontWeight:700,color:isSel?ON_GOLD:C.ink,marginBottom:5}}>{s.name.split(" ")[0]}</div>
-                <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:SB[st],color:SC[st],fontWeight:700}}>{SL[st]}</span>
+              <button key={s.id} onClick={()=>{setSelected(s);setGps("idle");setGpsMsg("");}} style={{background:isSel?C.gold:C.paper,border:`2px solid ${isSel?C.gold:C.border}`,borderRadius:14,padding:"12px 8px",cursor:"pointer",textAlign:"center",boxShadow:isSel?C.shadow:"none"}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:isSel?"rgba(255,255,255,0.28)":SUBTLE,color:isSel?ON_GOLD:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:600,margin:"0 auto 7px",fontFamily:SERIF}}>{nameToAvatar(s.name)}</div>
+                <div style={{fontSize:12,fontWeight:700,color:isSel?ON_GOLD:C.ink,marginBottom:6}}>{s.name.split(" ")[0]}</div>
+                <span style={{fontSize:10,padding:"3px 9px",borderRadius:20,background:isSel?"rgba(255,255,255,0.25)":SB[st],color:isSel?ON_GOLD:SC[st],fontWeight:700}}>{SL[st]}</span>
               </button>
             );
           })}
@@ -641,49 +683,46 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
       {selected&&(
         <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-            <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${C.gold},${C.gold2})`,color:ON_GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700}}>{nameToAvatar(selected.name)}</div>
+            <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${C.gold2},${C.gold})`,color:ON_GOLD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:600,fontFamily:SERIF}}>{nameToAvatar(selected.name)}</div>
             <div>
-              <div style={{fontSize:17,fontWeight:700}}>{selected.name}</div>
-              {shift&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>シフト: {shift.start_time} 〜 {shift.end_time}</div>}
+              <div style={{fontSize:17,fontWeight:600,fontFamily:SERIF}}>{selected.name}</div>
+              {shift&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>{t("shiftLabel")}: {shift.start_time} 〜 {shift.end_time}</div>}
             </div>
-            <span style={{marginLeft:"auto",fontSize:11,padding:"4px 12px",borderRadius:20,background:SB[status],color:SC[status],fontWeight:700}}>{SL[status]}</span>
+            <span style={{marginLeft:"auto",fontSize:11,padding:"5px 13px",borderRadius:20,background:SB[status],color:SC[status],fontWeight:700}}>{SL[status]}</span>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            {[["出勤","🟢",att?.clock_in],["退勤","🔵",att?.clock_out]].map(([label,icon,ts])=>(
-              <div key={label} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
-                <div style={{fontSize:11,color:C.muted,marginBottom:3}}>{icon} {label}時刻</div>
-                <div style={{fontSize:19,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{ts?fmtHM(ts):"──"}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:15}}>
+            {[[t("lbl_in"),C.blue,att?.clock_in],[t("lbl_out"),C.accent,att?.clock_out]].map(([label,dot,ts])=>(
+              <div key={label} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 12px",textAlign:"center"}}>
+                <div style={{fontSize:10.5,color:C.muted,marginBottom:4,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span style={{width:7,height:7,borderRadius:"50%",background:dot,display:"inline-block"}}/>{label}{t("lbl_timeSuffix")}</div>
+                <div style={{fontSize:22,fontWeight:600,fontVariantNumeric:"tabular-nums",fontFamily:SERIF,color:ts?C.ink:FAINT}}>{ts?fmtHM(ts):"──"}</div>
               </div>
             ))}
           </div>
-          {gps!=="idle"&&<div style={{marginBottom:14,padding:"9px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:gps==="ok"?C.greenBg:gps==="checking"?C.surface2:(isDarkTheme?"#2a0d0d":"#fde8e6"),color:gps==="ok"?C.green:gps==="checking"?C.gold:C.accent,display:"flex",alignItems:"center",gap:8}}><span>{gps==="checking"?"📡":gps==="ok"?"📍":"🚫"}</span>{gpsMsg}</div>}
+          {gps!=="idle"&&<div style={{marginBottom:14,padding:"10px 14px",borderRadius:10,fontSize:12,fontWeight:700,background:gpsBg,color:gpsColor,display:"flex",alignItems:"center",gap:8}}><Icon name={gpsIcon} size={16}/>{gpsMsg}</div>}
           <div style={{display:"flex",gap:10}}>
-            <button disabled={!canIn} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:canIn?C.green:C.surface2,color:canIn?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canIn?"pointer":"not-allowed",fontFamily:"inherit"}}>🟢 出勤打刻</button>
-            <button disabled={!canOut} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:canOut?C.blue:C.surface2,color:canOut?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canOut?"pointer":"not-allowed",fontFamily:"inherit"}}>🔵 退勤打刻</button>
+            <button disabled={!canIn} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:canIn?C.green:C.surface2,color:canIn?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canIn?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="check" size={16}/>{t("btn_in")}</button>
+            <button disabled={!canOut} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:"none",background:canOut?C.blue:C.surface2,color:canOut?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canOut?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="power" size={16}/>{t("btn_out")}</button>
           </div>
-          {singleUser&&<div style={{marginTop:8,textAlign:"center",fontSize:11,color:C.muted}}>🔒 {CONFIG.storeAddress}から{STORE_RADIUS_M}m以内の位置情報が必要です</div>}
-          {!singleUser&&<div style={{marginTop:8,textAlign:"center",fontSize:11,color:C.gold}}>⚡ 管理者モード：位置情報チェックなし</div>}
+          {singleUser&&<div style={{marginTop:11,textAlign:"center",fontSize:11,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pin" size={13}/>{t("gps_note",CONFIG.storeAddress,STORE_RADIUS_M)}</div>}
+          {!singleUser&&<div style={{marginTop:11,textAlign:"center",fontSize:11,color:C.gold,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="signal" size={13}/>{t("admin_note")}</div>}
         </div>
       )}
       {!singleUser&&(
         <div style={{marginTop:24}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10}}>📋 本日の出勤状況</div>
+          <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,display:"flex",alignItems:"center",gap:7}}><Icon name="list" size={15}/>{t("todayStatus")}</div>
           <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
             {staff.map((s,i)=>{
               const a=getAtt(s.id,today),st=!a?.clock_in?"absent":!a?.clock_out?"working":"done";
-              const SL2={absent:"未出勤",working:"勤務中",done:"退勤済"};
-              const SC2={absent:C.muted,working:C.green,done:C.blue};
-              const SB2={absent:C.surface2,working:C.greenBg,done:C.blueBg};
               return (
-                <div key={s.id} style={{display:"flex",alignItems:"center",padding:"10px 14px",gap:10,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none"}}>
-                  <div style={{width:30,height:30,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{nameToAvatar(s.name)}</div>
+                <div key={s.id} style={{display:"flex",alignItems:"center",padding:"11px 14px",gap:10,borderBottom:i<staff.length-1?`1px solid ${C.border2}`:"none"}}>
+                  <div style={{width:30,height:30,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,fontFamily:SERIF}}>{nameToAvatar(s.name)}</div>
                   <div style={{flex:1,fontSize:13,fontWeight:600}}>{s.name}</div>
-                  <div style={{fontSize:11,color:C.muted,textAlign:"right",minWidth:100}}>
-                    {a?.clock_in&&<div>出勤 {fmtHM(a.clock_in)}</div>}
-                    {a?.clock_out&&<div>退勤 {fmtHM(a.clock_out)}</div>}
-                    {!a?.clock_in&&<div style={{color:FAINT}}>未出勤</div>}
+                  <div style={{fontSize:11,color:C.muted,textAlign:"right",minWidth:100,fontVariantNumeric:"tabular-nums"}}>
+                    {a?.clock_in&&<div>{t("lbl_in")} {fmtHM(a.clock_in)}</div>}
+                    {a?.clock_out&&<div>{t("lbl_out")} {fmtHM(a.clock_out)}</div>}
+                    {!a?.clock_in&&<div style={{color:FAINT}}>{t("st_absent")}</div>}
                   </div>
-                  <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:SB2[st],color:SC2[st],fontWeight:700,minWidth:44,textAlign:"center"}}>{SL2[st]}</span>
+                  <span style={{fontSize:10,padding:"3px 9px",borderRadius:20,background:SB[st],color:SC[st],fontWeight:700,minWidth:48,textAlign:"center"}}>{SL[st]}</span>
                 </div>
               );
             })}
@@ -695,6 +734,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
 }
 
 function CompareView({staff,getShiftByDate,getAtt}){
+  const {t}=useI18n();
   const [selStaff,setSelStaff]=useState(staff[0]);
   const [moOffset,setMoOffset]=useState(0);
   const today=new Date();
@@ -705,18 +745,20 @@ function CompareView({staff,getShiftByDate,getAtt}){
   const brkTotal=breaksTotalMin(parseBreaks(selStaff.breaks));
   return (
     <div>
-      <SectionTitle icon="🔍" title="シフト照合" sub="シフト予定と実際の出退勤を比較します"/>
+      <SectionTitle icon="search" title={t("cmp_title")} sub={t("cmp_sub")}/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
         {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={chip(selStaff.id===s.id)}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
-      <div style={{fontSize:11,color:C.muted,marginBottom:10}}>休憩: <span style={{color:C.gold,fontWeight:700}}>計{brkTotal}分</span></div>
+      <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{t("breakLabel")}: <span style={{color:C.gold,fontWeight:700}}>{t("breakTotal",brkTotal)}</span></div>
       <MonthTable staff={selStaff} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today}/>
     </div>
   );
 }
 
 function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,showToast,getShiftByDate}){
+  const {t}=useI18n();
+  const DAYS=t.arr("daysSun");
   const [selStaff,setSelStaff]=useState(staff[0]);
   const [moOffset,setMoOffset]=useState(0);
   const [editModal,setEditModal]=useState(null);
@@ -725,7 +767,6 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
   const base=new Date(today.getFullYear(),today.getMonth()+moOffset,1);
   const year=base.getFullYear(),month=base.getMonth();
   const monthDates=Array.from({length:new Date(year,month+1,0).getDate()},(_,i)=>new Date(year,month,i+1));
-  const DAYS_JA=["日","月","火","水","木","金","土"];
 
   function getAttD(date){ return attendance.find(a=>a.staff_id===selStaff?.id&&a.date===toDateStr(date))||null; }
 
@@ -733,7 +774,7 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
     const att=getAttD(d);
     setEditModal({
       dateStr:toDateStr(d),
-      dateLabel:`${month+1}/${d.getDate()}（${DAYS_JA[d.getDay()]}）`,
+      dateLabel:`${t("md",month,d.getDate())}（${DAYS[d.getDay()]}）`,
       inVal:att?.clock_in?new Date(att.clock_in).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}):"",
       outVal:att?.clock_out?new Date(att.clock_out).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}):"",
     });
@@ -742,39 +783,39 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
     setSaving(true);
     await editAttendance(selStaff.id,editModal.dateStr,"in",editModal.inVal||null);
     await editAttendance(selStaff.id,editModal.dateStr,"out",editModal.outVal||null);
-    setSaving(false); setEditModal(null); showToast("✏️ 勤怠を修正しました");
+    setSaving(false); setEditModal(null); showToast(t("toast_fixed"));
   }
   async function deleteDay(){
     setSaving(true);
     await clearAttendanceDay(selStaff.id,editModal.dateStr);
-    setSaving(false); setEditModal(null); showToast("🗑 打刻記録を削除しました");
+    setSaving(false); setEditModal(null); showToast(t("toast_delPunch"));
   }
 
   if(!selStaff) return null;
   return (
     <div>
-      <SectionTitle icon="✏️" title="勤怠修正" sub="スタッフの出退勤時刻を手動で変更・追加・削除できます"/>
+      <SectionTitle icon="pencil" title={t("edit_title")} sub={t("edit_sub")}/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
         {staff.map(s=><button key={s.id} onClick={()=>setSelStaff(s)} style={chip(selStaff.id===s.id)}>{nameToAvatar(s.name)} {s.name}</button>)}
       </div>
       <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
-        <div style={{background:HEAD_BG,padding:"9px 14px",display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
-          <span>日付</span><span>曜</span><span>シフト</span><span>出勤</span><span>退勤</span><span style={{textAlign:"center"}}>修正</span>
+        <div style={{background:HEAD_BG,padding:"10px 14px",display:"grid",gridTemplateColumns:"60px 30px 100px 80px 80px 70px",gap:8,fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
+          <span>{t("h_date")}</span><span>{t("h_day")}</span><span>{t("h_shift")}</span><span>{t("h_in")}</span><span>{t("h_out")}</span><span style={{textAlign:"center"}}>{t("btn_edit")}</span>
         </div>
         {monthDates.map((d,i)=>{
           const att=getAttD(d),sh=getShiftByDate(d,selStaff.id);
           const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
           const hasRecord=att?.clock_in||att?.clock_out;
           return (
-            <div key={i} style={{display:"grid",gridTemplateColumns:"60px 30px 90px 80px 80px 60px",gap:8,alignItems:"center",padding:"8px 14px",borderBottom:i<monthDates.length-1?`1px solid ${C.border}`:"none",background:isToday?C.surface2:i%2===0?ROW_A:ROW_B}}>
-              <span style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?C.gold:C.ink}}>{month+1}/{d.getDate()}{isToday?" ✦":""}</span>
-              <span style={{fontSize:12,color:isWE?C.gold:C.muted,fontWeight:600}}>{DAYS_JA[d.getDay()]}</span>
-              <span style={{fontSize:11,color:sh?C.green:FAINT}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</span>
-              <span style={{fontSize:12,color:att?.clock_in?C.blue:FAINT,fontWeight:att?.clock_in?600:400}}>{att?.clock_in?fmtHM(att.clock_in):"──"}</span>
-              <span style={{fontSize:12,color:att?.clock_out?C.accent:FAINT,fontWeight:att?.clock_out?600:400}}>{att?.clock_out?fmtHM(att.clock_out):"──"}</span>
-              <button onClick={()=>openEdit(d)} style={{padding:"4px 8px",borderRadius:8,border:`1px solid ${C.border}`,background:hasRecord?C.surface2:C.bg,color:C.ink,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
-                {hasRecord?"✏️ 編集":"➕ 追加"}
+            <div key={i} style={{display:"grid",gridTemplateColumns:"60px 30px 100px 80px 80px 70px",gap:8,alignItems:"center",padding:"8px 14px",borderBottom:i<monthDates.length-1?`1px solid ${C.border2}`:"none",background:isToday?C.surface2:i%2===0?ROW_A:ROW_B}}>
+              <span style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?C.gold:C.ink,fontVariantNumeric:"tabular-nums"}}>{t("md",month,d.getDate())}{isToday?" ✦":""}</span>
+              <span style={{fontSize:12,color:isWE?C.gold:C.muted,fontWeight:600}}>{DAYS[d.getDay()]}</span>
+              <span style={{fontSize:11,color:sh?C.green:FAINT,fontVariantNumeric:"tabular-nums"}}>{sh?`${sh.start_time}〜${sh.end_time}`:"──"}</span>
+              <span style={{fontSize:12,color:att?.clock_in?C.blue:FAINT,fontWeight:att?.clock_in?600:400,fontVariantNumeric:"tabular-nums"}}>{att?.clock_in?fmtHM(att.clock_in):"──"}</span>
+              <span style={{fontSize:12,color:att?.clock_out?C.accent:FAINT,fontWeight:att?.clock_out?600:400,fontVariantNumeric:"tabular-nums"}}>{att?.clock_out?fmtHM(att.clock_out):"──"}</span>
+              <button onClick={()=>openEdit(d)} style={{padding:"5px 9px",borderRadius:8,border:`1px solid ${C.border}`,background:hasRecord?C.surface2:C.bg,color:C.ink,fontSize:11,cursor:"pointer",fontFamily:SANS,fontWeight:600,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                <Icon name={hasRecord?"pencil":"plus"} size={13}/>{hasRecord?t("btn_edit"):t("btn_add")}
               </button>
             </div>
           );
@@ -782,15 +823,15 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
       </div>
       {editModal&&(
         <Modal onClose={()=>setEditModal(null)}>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{selStaff.name}</div>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:3,fontFamily:SERIF}}>{selStaff.name}</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:20}}>{editModal.dateLabel}</div>
           <div style={{display:"flex",gap:12,marginBottom:8}}>
-            <label style={LS}>出勤時刻<input type="time" value={editModal.inVal} onChange={e=>setEditModal(p=>({...p,inVal:e.target.value}))} style={{...SS,width:"100%"}}/></label>
-            <label style={LS}>退勤時刻<input type="time" value={editModal.outVal} onChange={e=>setEditModal(p=>({...p,outVal:e.target.value}))} style={{...SS,width:"100%"}}/></label>
+            <label style={LS}>{t("inTime")}<input type="time" value={editModal.inVal} onChange={e=>setEditModal(p=>({...p,inVal:e.target.value}))} style={{...SS,width:"100%"}}/></label>
+            <label style={LS}>{t("outTime")}<input type="time" value={editModal.outVal} onChange={e=>setEditModal(p=>({...p,outVal:e.target.value}))} style={{...SS,width:"100%"}}/></label>
           </div>
-          <div style={{fontSize:11,color:C.muted,marginBottom:18}}>※ 空欄にすると該当の打刻を削除します</div>
-          <button onClick={saveEdit} disabled={saving} style={PB(C.ink)}>{saving?"保存中...":"💾 保存する"}</button>
-          <button onClick={deleteDay} disabled={saving} style={{...PB("danger"),marginTop:8}}>🗑 この日の記録を全削除</button>
+          <div style={{fontSize:11,color:C.muted,marginBottom:18}}>{t("clearNote")}</div>
+          <button onClick={saveEdit} disabled={saving} style={PB(C.ink)}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
+          <button onClick={deleteDay} disabled={saving} style={{...PB("danger"),marginTop:8}}><Icon name="trash" size={15}/>{t("delDay")}</button>
         </Modal>
       )}
     </div>
@@ -798,13 +839,14 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
 }
 
 function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
+  const {t}=useI18n();
   const [editing,setEditing]=useState({});
   const today=new Date(),base=new Date(today.getFullYear(),today.getMonth(),1);
   const monthDates=Array.from({length:new Date(base.getFullYear(),base.getMonth()+1,0).getDate()},(_,i)=>new Date(base.getFullYear(),base.getMonth(),i+1));
 
   async function save(staffId,currentWage){
     const v=parseInt(editing[staffId]??currentWage);
-    if(!v||v<900||v>5000){ showToast("❌ 有効な時給を入力してください（900〜5000円）","error"); return; }
+    if(!v||v<900||v>5000){ showToast(t("wageErr"),"error"); return; }
     await updateStaff(staffId,{wage:v});
     setEditing(p=>({...p,[staffId]:undefined}));
   }
@@ -818,42 +860,43 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
 
   return (
     <div>
-      <SectionTitle icon="💴" title="時給・給与設定" sub="スタッフごとの時給と今月の給与を確認できます"/>
-      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden"}}>
-        <div style={{background:HEAD_BG,padding:"9px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
-          <span>スタッフ</span><span style={{textAlign:"right"}}>時給</span><span style={{textAlign:"center"}}>今月実働</span><span style={{textAlign:"right"}}>今月給与</span><span style={{textAlign:"center"}}>変更</span>
+      <SectionTitle icon="yen" title={t("wage_title")} sub={t("wage_sub")}/>
+      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
+        <div style={{background:HEAD_BG,padding:"10px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
+          <span>{t("col_staff")}</span><span style={{textAlign:"right"}}>{t("w_hourly")}</span><span style={{textAlign:"center"}}>{t("w_worked")}</span><span style={{textAlign:"right"}}>{t("w_pay")}</span><span style={{textAlign:"center"}}>{t("w_change")}</span>
         </div>
         {staff.map((s,i)=>{
           const sum=monthSummary(s);
           const brkTotal=breaksTotalMin(parseBreaks(s.breaks));
           return (
-            <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?ROW_A:ROW_B}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:28,height:28,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{nameToAvatar(s.name)}</div>
+            <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border2}`:"none",background:i%2===0?ROW_A:ROW_B}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,fontFamily:SERIF}}>{nameToAvatar(s.name)}</div>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{s.name}</div>
-                  <div style={{fontSize:10,color:C.muted}}>休憩計{brkTotal}分</div>
+                  <div style={{fontSize:10,color:C.muted}}>{t("breaksUnit",brkTotal)}</div>
                 </div>
               </div>
-              <div style={{textAlign:"right",fontSize:13,fontWeight:700}}>¥{s.wage?.toLocaleString()}</div>
-              <div style={{textAlign:"center",fontSize:12,color:C.muted}}>{Math.floor(sum.mins/60)}h{sum.mins%60}m</div>
-              <div style={{textAlign:"right",fontSize:13,fontWeight:700,color:C.accent}}>¥{sum.pay.toLocaleString()}</div>
+              <div style={{textAlign:"right",fontSize:13,fontWeight:600,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{s.wage?.toLocaleString()}</div>
+              <div style={{textAlign:"center",fontSize:12,color:C.muted,fontVariantNumeric:"tabular-nums"}}>{Math.floor(sum.mins/60)}h{sum.mins%60}m</div>
+              <div style={{textAlign:"right",fontSize:13,fontWeight:600,color:C.accent,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{sum.pay.toLocaleString()}</div>
               <div style={{display:"flex",gap:5,alignItems:"center"}}>
                 <input type="number" value={editing[s.id]??s.wage??""} min={900} max={5000}
                   onChange={e=>setEditing(p=>({...p,[s.id]:e.target.value}))}
-                  style={{width:65,padding:"5px 6px",borderRadius:7,border:`1px solid ${C.border}`,fontFamily:"inherit",fontSize:12,textAlign:"right",outline:"none",background:C.bg,color:C.ink,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
-                <button onClick={()=>save(s.id,s.wage)} style={{padding:"5px 8px",borderRadius:8,border:"none",background:C.gold,color:ON_GOLD,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>更新</button>
+                  style={{width:65,padding:"6px 7px",borderRadius:7,border:`1px solid ${C.border}`,fontFamily:SANS,fontSize:12,textAlign:"right",outline:"none",background:C.bg,color:C.ink,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+                <button onClick={()=>save(s.id,s.wage)} style={{padding:"6px 10px",borderRadius:8,border:"none",background:C.gold,color:ON_GOLD,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:SANS,whiteSpace:"nowrap"}}>{t("w_update")}</button>
               </div>
             </div>
           );
         })}
       </div>
-      <div style={{marginTop:10,fontSize:11,color:C.muted}}>※ シフト時間で計算（早出・残業は一切カウントしません）。休憩は各スタッフの休憩設定に応じて差し引きます。</div>
+      <div style={{marginTop:11,fontSize:11,color:C.muted}}>{t("wageFoot")}</div>
     </div>
   );
 }
 
 function BreakEditor({breaks,setBreaks,templates,onPickTemplate}){
+  const {t}=useI18n();
   function update(i,idx,val){
     const m=toMin(val);
     setBreaks(p=>p.map((row,ri)=>ri===i?(idx===0?[m,row[1]]:[row[0],m]):row));
@@ -865,39 +908,40 @@ function BreakEditor({breaks,setBreaks,templates,onPickTemplate}){
     <div>
       {templates&&templates.length>0&&(
         <div style={{marginBottom:12}}>
-          <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:4}}>テンプレから取り込む</label>
-          <select value="" onChange={e=>{const t=templates.find(t=>String(t.id)===e.target.value); if(t) onPickTemplate(parseBreaks(t.breaks));}}
-            style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box"}}>
-            <option value="">選択して取り込み...</option>
-            {templates.map(t=><option key={t.id} value={t.id}>{t.name}（計{breaksTotalMin(parseBreaks(t.breaks))}分）</option>)}
+          <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("be_fromTpl")}</label>
+          <select value="" onChange={e=>{const tp=templates.find(x=>String(x.id)===e.target.value); if(tp) onPickTemplate(parseBreaks(tp.breaks));}}
+            style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:SANS,fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box"}}>
+            <option value="">{t("be_pick")}</option>
+            {templates.map(tp=><option key={tp.id} value={tp.id}>{t("be_opt",tp.name,breaksTotalMin(parseBreaks(tp.breaks)))}</option>)}
           </select>
         </div>
       )}
       <div style={{fontSize:11,color:C.muted,marginBottom:6,display:"flex",justifyContent:"space-between"}}>
-        <span>休憩時間帯</span><span style={{color:C.gold,fontWeight:700}}>合計 {total}分</span>
+        <span>{t("be_slots")}</span><span style={{color:C.gold,fontWeight:700}}>{t("be_total",total)}</span>
       </div>
-      {breaks.length===0&&<div style={{fontSize:12,color:C.muted,padding:"8px 0"}}>休憩なし</div>}
+      {breaks.length===0&&<div style={{fontSize:12,color:C.muted,padding:"8px 0"}}>{t("noBreak")}</div>}
       {breaks.map((row,i)=>(
         <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
           <input type="time" value={minToHM(row[0])} onChange={e=>update(i,0,e.target.value)} style={{...SS,flex:1}}/>
           <span style={{color:C.muted}}>〜</span>
           <input type="time" value={minToHM(row[1])} onChange={e=>update(i,1,e.target.value)} style={{...SS,flex:1}}/>
-          <span style={{fontSize:11,color:C.muted,width:40,textAlign:"right"}}>{Math.max(0,row[1]-row[0])}分</span>
-          <button onClick={()=>removeRow(i)} style={{padding:"4px 8px",borderRadius:7,border:`1px solid ${C.accent}55`,background:isDarkTheme?"#2a0d0d":"#fde8e6",color:C.accent,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>🗑</button>
+          <span style={{fontSize:11,color:C.muted,width:48,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{t("minUnit",Math.max(0,row[1]-row[0]))}</span>
+          <button onClick={()=>removeRow(i)} style={{padding:"5px 8px",borderRadius:7,border:`1px solid ${C.accent}55`,background:DANGER_BG,color:C.accent,cursor:"pointer",fontFamily:SANS,display:"inline-flex"}}><Icon name="trash" size={14}/></button>
         </div>
       ))}
-      <button onClick={addRow} style={{width:"100%",padding:"8px",marginTop:4,borderRadius:9,border:`1px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:12,fontWeight:700,cursor:"pointer"}}>＋ 休憩を追加</button>
+      <button onClick={addRow} style={{width:"100%",padding:"9px",marginTop:4,borderRadius:8,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7}}><Icon name="plus" size={15}/>{t("be_add")}</button>
     </div>
   );
 }
 
 function BreakTemplateView({templates,addTemplate,updateTemplate,deleteTemplate}){
+  const {t}=useI18n();
   const [modal,setModal]=useState(null);
   const [saving,setSaving]=useState(false);
   const [deleteConfirm,setDeleteConfirm]=useState(null);
 
   function openNew(){ setModal({name:"",breaks:[]}); }
-  function openEdit(t){ setModal({id:t.id,name:t.name,breaks:parseBreaks(t.breaks)}); }
+  function openEdit(tp){ setModal({id:tp.id,name:tp.name,breaks:parseBreaks(tp.breaks)}); }
 
   async function save(){
     if(!modal.name.trim()) return;
@@ -909,29 +953,32 @@ function BreakTemplateView({templates,addTemplate,updateTemplate,deleteTemplate}
 
   return (
     <div>
-      <SectionTitle icon="☕" title="休憩テンプレート" sub="休憩パターンのひな形を作成・編集します（スタッフに取り込んで使います）"/>
-      <button onClick={openNew} style={{width:"100%",padding:"12px",marginBottom:20,borderRadius:12,border:`1px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-        ＋ 新規テンプレートを作成する
+      <SectionTitle icon="coffee" title={t("brk_title")} sub={t("brk_sub")}/>
+      <button onClick={openNew} style={{width:"100%",padding:"12px",marginBottom:20,borderRadius:12,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:13,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
+        <Icon name="plus" size={16}/>{t("brk_new")}
       </button>
       <div style={{display:"grid",gap:12}}>
-        {templates.length===0&&<div style={{fontSize:12,color:C.muted,textAlign:"center",padding:20}}>テンプレートがありません</div>}
-        {templates.map(t=>{
-          const breaks=parseBreaks(t.breaks);
+        {templates.length===0&&<div style={{fontSize:12,color:C.muted,textAlign:"center",padding:20}}>{t("brk_none")}</div>}
+        {templates.map(tp=>{
+          const breaks=parseBreaks(tp.breaks);
           return (
-            <div key={t.id} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,padding:16,boxShadow:C.shadow}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <div>
-                  <div style={{fontSize:14,fontWeight:700}}>☕ {t.name}</div>
-                  <div style={{fontSize:11,color:C.gold,marginTop:2}}>休憩計 {breaksTotalMin(breaks)}分・{breaks.length}本</div>
+            <div key={tp.id} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,padding:16,boxShadow:C.shadow}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:11}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{width:34,height:34,borderRadius:9,background:isDarkTheme?"#241d0a":"#f4ecd6",color:C.gold,display:"inline-flex",alignItems:"center",justifyContent:"center"}}><Icon name="coffee" size={18}/></span>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:600,fontFamily:SERIF}}>{tp.name}</div>
+                    <div style={{fontSize:11,color:C.gold,marginTop:2}}>{t("brk_count",breaksTotalMin(breaks),breaks.length)}</div>
+                  </div>
                 </div>
                 <div style={{display:"flex",gap:6}}>
-                  <button onClick={()=>openEdit(t)} style={{padding:"5px 10px",borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.ink,fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>✏️ 編集</button>
-                  <button onClick={()=>setDeleteConfirm(t.id)} style={{padding:"5px 10px",borderRadius:8,border:`1px solid ${C.accent}55`,background:isDarkTheme?"#2a0d0d":"#fde8e6",color:C.accent,fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>🗑</button>
+                  <button onClick={()=>openEdit(tp)} style={{padding:"6px 11px",borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.ink,fontSize:12,cursor:"pointer",fontFamily:SANS,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5}}><Icon name="pencil" size={13}/>{t("btn_edit")}</button>
+                  <button onClick={()=>setDeleteConfirm(tp.id)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.accent}55`,background:DANGER_BG,color:C.accent,cursor:"pointer",fontFamily:SANS,display:"inline-flex"}}><Icon name="trash" size={14}/></button>
                 </div>
               </div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {breaks.length===0?<span style={{fontSize:12,color:C.muted}}>休憩なし</span>:breaks.map(([a,b],i)=>(
-                  <span key={i} style={{fontSize:11,padding:"3px 9px",borderRadius:8,background:C.surface2,color:C.ink,fontWeight:600}}>{minToHM(a)}〜{minToHM(b)}</span>
+              <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                {breaks.length===0?<span style={{fontSize:12,color:C.muted}}>{t("noBreak")}</span>:breaks.map(([a,b],i)=>(
+                  <span key={i} style={{fontSize:11.5,padding:"4px 10px",borderRadius:8,background:C.surface2,color:C.ink,fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{minToHM(a)}〜{minToHM(b)}</span>
                 ))}
               </div>
             </div>
@@ -940,22 +987,22 @@ function BreakTemplateView({templates,addTemplate,updateTemplate,deleteTemplate}
       </div>
       {modal&&(
         <Modal onClose={()=>setModal(null)}>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>{modal.id?"テンプレートを編集":"新規テンプレート"}</div>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:14,fontFamily:SERIF}}>{modal.id?t("brk_editTitle"):t("brk_newTitle")}</div>
           <div style={{marginBottom:14}}>
-            <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:4}}>テンプレ名</label>
-            <input type="text" value={modal.name} placeholder="例: デフォルト / CS"
+            <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("brk_name")}</label>
+            <input type="text" value={modal.name} placeholder={t("brk_namePh")}
               onChange={e=>setModal(p=>({...p,name:e.target.value}))}
-              style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+              style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:SANS,fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
           </div>
           <BreakEditor breaks={modal.breaks} setBreaks={fn=>setModal(p=>({...p,breaks:typeof fn==="function"?fn(p.breaks):fn}))}/>
-          <button onClick={save} disabled={saving||!modal.name.trim()} style={{...PB(C.ink),marginTop:16}}>{saving?"保存中...":"💾 保存する"}</button>
+          <button onClick={save} disabled={saving||!modal.name.trim()} style={{...PB(C.ink),marginTop:16}}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
         </Modal>
       )}
       {deleteConfirm&&(
         <Modal onClose={()=>setDeleteConfirm(null)}>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>🗑 テンプレート削除</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>{templates.find(t=>t.id===deleteConfirm)?.name} を削除しますか？<br/><span style={{color:C.accent,fontSize:12}}>※ 既にスタッフに取り込んだ休憩には影響しません。</span></div>
-          <button onClick={async()=>{setSaving(true);await deleteTemplate(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...PB("danger"),marginBottom:8}}>{saving?"削除中...":"削除する"}</button>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:8,fontFamily:SERIF,display:"flex",alignItems:"center",gap:8}}><Icon name="trash" size={18} style={{color:C.accent}}/>{t("brk_delTitle")}</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>{t("brk_delMsg",templates.find(x=>x.id===deleteConfirm)?.name)}<br/><span style={{color:C.accent,fontSize:12}}>{t("brk_delNote")}</span></div>
+          <button onClick={async()=>{setSaving(true);await deleteTemplate(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...PB("danger"),marginBottom:8}}><Icon name="trash" size={15}/>{saving?t("deleting"):t("delete")}</button>
         </Modal>
       )}
     </div>
@@ -963,6 +1010,7 @@ function BreakTemplateView({templates,addTemplate,updateTemplate,deleteTemplate}
 }
 
 function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
+  const {t}=useI18n();
   const [showAdd,setShowAdd]=useState(false);
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({name:"",username:"",password:"",wage:"",breaks:[]});
@@ -972,14 +1020,14 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
 
   function validate(f,currentId=null){
     const errs={};
-    if(!f.name.trim()) errs.name="名前を入力してください";
-    if(!f.username.trim()) errs.username="ユーザー名を入力してください";
-    else if(!/^[a-zA-Z0-9_]+$/.test(f.username)) errs.username="半角英数字・アンダースコアのみ使用可";
-    else if(staff.some(s=>s.username===f.username&&s.id!==currentId)) errs.username="このユーザー名は既に使用されています";
-    if(!f.password.trim()) errs.password="パスワードを入力してください";
-    else if(f.password.length<4) errs.password="4文字以上で入力してください";
+    if(!f.name.trim()) errs.name=t("err_name");
+    if(!f.username.trim()) errs.username=t("err_uname");
+    else if(!/^[a-zA-Z0-9_]+$/.test(f.username)) errs.username=t("err_unameFmt");
+    else if(staff.some(s=>s.username===f.username&&s.id!==currentId)) errs.username=t("err_unameDup");
+    if(!f.password.trim()) errs.password=t("err_pw");
+    else if(f.password.length<4) errs.password=t("err_pwLen");
     const w=parseInt(f.wage);
-    if(!f.wage||isNaN(w)||w<900||w>5000) errs.wage="時給は900〜5000円で入力してください";
+    if(!f.wage||isNaN(w)||w<900||w>5000) errs.wage=t("err_wage");
     return errs;
   }
 
@@ -1005,14 +1053,14 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
     setEditId(null); setErrors({}); setSaving(false);
   }
 
-  function FField(key,placeholder,type="text"){
+  function FField(key,label,placeholder,type="text"){
     return (
       <div style={{marginBottom:12}}>
-        <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:4}}>{placeholder}</label>
+        <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{label}</label>
         <input type={type} value={form[key]} placeholder={placeholder}
           onChange={e=>setForm(p=>({...p,[key]:e.target.value}))}
-          style={{width:"100%",padding:"9px 12px",borderRadius:9,border:`1.5px solid ${errors[key]?C.accent:C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
-        {errors[key]&&<div style={{fontSize:11,color:C.accent,marginTop:3}}>⚠ {errors[key]}</div>}
+          style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1.5px solid ${errors[key]?C.accent:C.border}`,fontFamily:SANS,fontSize:13,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+        {errors[key]&&<div style={{fontSize:11,color:C.accent,marginTop:4,display:"flex",alignItems:"center",gap:4}}><Icon name="warn" size={12}/>{errors[key]}</div>}
       </div>
     );
   }
@@ -1021,69 +1069,69 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
 
   return (
     <div>
-      <SectionTitle icon="👤" title="アカウント管理" sub="スタッフアカウントの発行・編集・削除"/>
+      <SectionTitle icon="users" title={t("acc_title")} sub={t("acc_sub")}/>
       {showAdd?(
-        <div style={{border:`1px solid ${C.gold}44`,borderRadius:14,padding:20,marginBottom:20,background:C.paper,boxShadow:C.shadow}}>
-          <div style={{fontSize:14,fontWeight:700,marginBottom:16}}>➕ 新規アカウント発行</div>
+        <div style={{border:`1px solid ${C.gold}`,borderRadius:14,padding:20,marginBottom:20,background:C.paper,boxShadow:C.shadow}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:16,fontFamily:SERIF,display:"flex",alignItems:"center",gap:8}}><Icon name="plus" size={16} style={{color:C.gold}}/>{t("acc_newTitle")}</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div>{FField("name","氏名（例: 山本 花子）")}</div>
-            <div>{FField("username","ユーザー名（半角英数字）")}</div>
-            <div>{FField("password","パスワード（4文字以上）","password")}</div>
-            <div>{FField("wage","時給（円）","number")}</div>
+            <div>{FField("name",t("f_name"),t("f_namePh"))}</div>
+            <div>{FField("username",t("col_uname"),t("f_unamePh"))}</div>
+            <div>{FField("password",t("password"),t("f_pwPh"),"password")}</div>
+            <div>{FField("wage",t("f_wageYen"),t("f_wageYen"),"number")}</div>
           </div>
           <div style={{marginTop:4,marginBottom:8,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-            <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.gold}}>☕ 休憩設定</div>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.gold,display:"flex",alignItems:"center",gap:7}}><Icon name="coffee" size={15}/>{t("breakSetting")}</div>
             <BreakEditor breaks={form.breaks} setBreaks={setBreaks} templates={templates} onPickTemplate={b=>setBreaks(b)}/>
           </div>
           <div style={{display:"flex",gap:10,marginTop:12}}>
-            <button onClick={handleAdd} disabled={saving} style={{...PB(C.ink),flex:1}}>{saving?"発行中...":"✅ 発行する"}</button>
-            <button onClick={()=>{setShowAdd(false);setErrors({});setForm({name:"",username:"",password:"",wage:"",breaks:[]});}} style={{...PB("ghost"),flex:1}}>キャンセル</button>
+            <button onClick={handleAdd} disabled={saving} style={{...PB(C.ink),flex:1}}><Icon name="check" size={15}/>{saving?t("acc_issuing"):t("acc_issue")}</button>
+            <button onClick={()=>{setShowAdd(false);setErrors({});setForm({name:"",username:"",password:"",wage:"",breaks:[]});}} style={{...PB("ghost"),flex:1}}>{t("cancel")}</button>
           </div>
         </div>
       ):(
-        <button onClick={()=>setShowAdd(true)} style={{width:"100%",padding:"12px",marginBottom:20,borderRadius:12,border:`1px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-          ＋ 新規アカウントを発行する
+        <button onClick={()=>setShowAdd(true)} style={{width:"100%",padding:"12px",marginBottom:20,borderRadius:12,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:13,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <Icon name="plus" size={16}/>{t("acc_new")}
         </button>
       )}
       <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
-        <div style={{background:HEAD_BG,padding:"9px 16px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center"}}>
-          <span>スタッフ</span><span>ユーザー名</span><span style={{textAlign:"right"}}>時給</span><span style={{textAlign:"center"}}>操作</span>
+        <div style={{background:HEAD_BG,padding:"10px 16px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center"}}>
+          <span>{t("col_staff")}</span><span>{t("col_uname")}</span><span style={{textAlign:"right"}}>{t("w_hourly")}</span><span style={{textAlign:"center"}}>{t("col_actions")}</span>
         </div>
         {staff.map((s,i)=>{
           const brkTotal=breaksTotalMin(parseBreaks(s.breaks));
           return (
           <div key={s.id}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center",padding:"12px 16px",borderBottom:editId===s.id||i<staff.length-1?`1px solid ${C.border}`:"none",background:i%2===0?ROW_A:ROW_B}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{nameToAvatar(s.name)}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 110px 80px 90px",gap:8,alignItems:"center",padding:"12px 16px",borderBottom:editId===s.id||i<staff.length-1?`1px solid ${C.border2}`:"none",background:i%2===0?ROW_A:ROW_B}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0,fontFamily:SERIF}}>{nameToAvatar(s.name)}</div>
                 <div>
-                  <div style={{fontSize:13,fontWeight:700}}>{s.name}</div>
-                  <div style={{fontSize:10,color:C.muted,marginTop:1}}>休憩計{brkTotal}分</div>
+                  <div style={{fontSize:13,fontWeight:600}}>{s.name}</div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:1}}>{t("breaksUnit",brkTotal)}</div>
                 </div>
               </div>
-              <div style={{fontSize:12,fontFamily:"monospace"}}>{s.username}</div>
-              <div style={{fontSize:13,fontWeight:700,textAlign:"right"}}>¥{s.wage?.toLocaleString()}</div>
-              <div style={{display:"flex",gap:5,justifyContent:"center"}}>
-                <button onClick={()=>openEdit(s)} style={{padding:"4px 8px",borderRadius:7,border:`1px solid ${C.border}`,background:C.bg,color:C.ink,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>✏️</button>
-                <button onClick={()=>setDeleteConfirm(s.id)} style={{padding:"4px 8px",borderRadius:7,border:`1px solid ${C.accent}55`,background:isDarkTheme?"#2a0d0d":"#fde8e6",fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,color:C.accent}}>🗑</button>
+              <div style={{fontSize:12,fontVariantNumeric:"tabular-nums",color:C.muted}}>{s.username}</div>
+              <div style={{fontSize:13,fontWeight:600,textAlign:"right",fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{s.wage?.toLocaleString()}</div>
+              <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+                <button onClick={()=>openEdit(s)} style={{padding:"5px 9px",borderRadius:7,border:`1px solid ${C.border}`,background:C.bg,color:C.ink,cursor:"pointer",fontFamily:SANS,display:"inline-flex"}}><Icon name="pencil" size={14}/></button>
+                <button onClick={()=>setDeleteConfirm(s.id)} style={{padding:"5px 9px",borderRadius:7,border:`1px solid ${C.accent}55`,background:DANGER_BG,cursor:"pointer",fontFamily:SANS,color:C.accent,display:"inline-flex"}}><Icon name="trash" size={14}/></button>
               </div>
             </div>
             {editId===s.id&&(
-              <div style={{padding:"16px 16px",background:C.surface2,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",borderTop:`1px solid ${C.gold}`}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:12}}>{s.name} を編集</div>
+              <div style={{padding:"16px",background:C.surface2,borderBottom:i<staff.length-1?`1px solid ${C.border}`:"none",borderTop:`1px solid ${C.gold}`}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:12}}>{t("acc_editName",s.name)}</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                  <div>{FField("name","氏名")}</div>
-                  <div>{FField("username","ユーザー名")}</div>
-                  <div>{FField("password","パスワード","password")}</div>
-                  <div>{FField("wage","時給（円）","number")}</div>
+                  <div>{FField("name",t("f_name"),t("f_name"))}</div>
+                  <div>{FField("username",t("col_uname"),t("col_uname"))}</div>
+                  <div>{FField("password",t("password"),t("password"),"password")}</div>
+                  <div>{FField("wage",t("f_wageYen"),t("f_wageYen"),"number")}</div>
                 </div>
                 <div style={{marginTop:4,marginBottom:8,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-                  <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.gold}}>☕ 休憩設定</div>
+                  <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.gold,display:"flex",alignItems:"center",gap:7}}><Icon name="coffee" size={15}/>{t("breakSetting")}</div>
                   <BreakEditor breaks={form.breaks} setBreaks={setBreaks} templates={templates} onPickTemplate={b=>setBreaks(b)}/>
                 </div>
                 <div style={{display:"flex",gap:10,marginTop:12}}>
-                  <button onClick={handleUpdate} disabled={saving} style={{...PB(C.ink),flex:1}}>{saving?"保存中...":"💾 保存する"}</button>
-                  <button onClick={()=>{setEditId(null);setErrors({});}} style={{...PB("ghost"),flex:1}}>キャンセル</button>
+                  <button onClick={handleUpdate} disabled={saving} style={{...PB(C.ink),flex:1}}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
+                  <button onClick={()=>{setEditId(null);setErrors({});}} style={{...PB("ghost"),flex:1}}>{t("cancel")}</button>
                 </div>
               </div>
             )}
@@ -1092,9 +1140,9 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
       </div>
       {deleteConfirm&&(
         <Modal onClose={()=>setDeleteConfirm(null)}>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>🗑 アカウント削除</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>{staff.find(s=>s.id===deleteConfirm)?.name} のアカウントを削除しますか？<br/><span style={{color:C.accent,fontSize:12}}>この操作は取り消せません。</span></div>
-          <button onClick={async()=>{setSaving(true);await deleteStaff(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...PB("danger"),marginBottom:8}}>{saving?"削除中...":"削除する"}</button>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:8,fontFamily:SERIF,display:"flex",alignItems:"center",gap:8}}><Icon name="trash" size={18} style={{color:C.accent}}/>{t("acc_delTitle")}</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>{t("acc_delMsg",staff.find(s=>s.id===deleteConfirm)?.name)}<br/><span style={{color:C.accent,fontSize:12}}>{t("acc_delNote")}</span></div>
+          <button onClick={async()=>{setSaving(true);await deleteStaff(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...PB("danger"),marginBottom:8}}><Icon name="trash" size={15}/>{saving?t("deleting"):t("delete")}</button>
         </Modal>
       )}
     </div>
@@ -1102,33 +1150,40 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
 }
 
 function SectionTitle({icon,title,sub}){
-  return <div style={{marginBottom:18}}><div style={{fontSize:17,fontWeight:700}}>{icon} {title}</div>{sub&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>{sub}</div>}<div style={{height:2,background:`linear-gradient(to right,${C.gold}88,transparent)`,marginTop:7,borderRadius:2}}/></div>;
+  return (
+    <div style={{marginBottom:18}}>
+      <div style={{fontSize:18,fontWeight:600,fontFamily:SERIF,letterSpacing:"0.03em",display:"flex",alignItems:"center",gap:9}}>
+        {icon&&<Icon name={icon} size={20} style={{color:C.gold}}/>}{title}
+      </div>
+      {sub&&<div style={{fontSize:11.5,color:C.muted,marginTop:3}}>{sub}</div>}
+      <div style={{height:1.5,background:`linear-gradient(to right,${C.gold2},transparent 65%)`,marginTop:9,borderRadius:2,opacity:0.7}}/>
+    </div>
+  );
 }
 function WeekNav({dates,offset,setOffset}){
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"9px 14px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}>‹ 前週</button><div style={{fontSize:13,fontWeight:700}}>{fmtDate(dates[0])} 〜 {fmtDate(dates[6])}{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8}}>今週</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>次週 ›</button></div>;
+  const {t}=useI18n();
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"8px 12px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}><Icon name="chevL" size={15}/>{t("prevWeek")}</button><div style={{fontSize:13,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{fmtDate(dates[0])} 〜 {fmtDate(dates[6])}{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8,fontWeight:700}}>{t("thisWeek")}</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>{t("nextWeek")}<Icon name="chevR" size={15}/></button></div>;
 }
 function WeekNavMonth({year,month,offset,setOffset}){
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"9px 14px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}>‹ 前月</button><div style={{fontSize:13,fontWeight:700}}>{year}年{month+1}月{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8}}>今月</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>次月 ›</button></div>;
+  const {t}=useI18n();
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"8px 12px"}}><button onClick={()=>setOffset(o=>o-1)} style={NB}><Icon name="chevL" size={15}/>{t("prevMonth")}</button><div style={{fontSize:13,fontWeight:700}}>{t("ym",year,month)}{offset===0&&<span style={{fontSize:11,color:C.gold,marginLeft:8,fontWeight:700}}>{t("thisMonth")}</span>}</div><button onClick={()=>setOffset(o=>o+1)} style={NB}>{t("nextMonth")}<Icon name="chevR" size={15}/></button></div>;
 }
 function Modal({children,onClose}){
-  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900,padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{background:C.paper,borderRadius:18,padding:24,maxWidth:420,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.35)",maxHeight:"90vh",overflowY:"auto"}}>{children}<button onClick={onClose} style={{width:"100%",padding:"10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontFamily:"inherit",fontSize:13,color:C.muted,cursor:"pointer",marginTop:8}}>キャンセル</button></div></div>;
+  const {t}=useI18n();
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900,padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{background:C.paper,borderRadius:18,padding:24,maxWidth:420,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.35)",maxHeight:"90vh",overflowY:"auto",border:`1px solid ${C.border}`}}>{children}<button onClick={onClose} style={{width:"100%",padding:"10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontFamily:SANS,fontSize:13,color:C.muted,cursor:"pointer",marginTop:8}}>{t("cancel")}</button></div></div>;
 }
-const NB={padding:"6px 14px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,color:C.muted};
-const LS={display:"flex",flexDirection:"column",gap:5,fontSize:12,color:C.muted,flex:1};
-const SS={padding:"8px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontFamily:"inherit",fontSize:13,background:C.bg,color:C.ink};
+const NB={padding:"6px 12px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",fontFamily:SANS,fontSize:12,color:C.muted,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5};
+const LS={display:"flex",flexDirection:"column",gap:5,fontSize:12,color:C.muted,flex:1,fontWeight:600};
+const SS={padding:"9px 10px",borderRadius:8,border:`1px solid ${C.border}`,fontFamily:SANS,fontSize:13,background:C.bg,color:C.ink};
 function chip(active){
-  return {padding:"7px 14px",borderRadius:20,border:`1.5px solid ${active?C.gold:C.border}`,background:active?C.gold:"transparent",color:active?ON_GOLD:C.muted,fontFamily:"inherit",fontSize:12,cursor:"pointer",fontWeight:600};
+  return {padding:"7px 14px",borderRadius:20,border:`1.5px solid ${active?C.gold:C.border}`,background:active?C.gold:"transparent",color:active?ON_GOLD:C.muted,fontFamily:SANS,fontSize:12,cursor:"pointer",fontWeight:600};
 }
-// PB: "danger"=削除系, "ghost"=キャンセル系, それ以外は背景色を渡す
+// PB: "danger"=delete, "ghost"=cancel, otherwise pass a background color
 function PB(kind){
-  if(kind==="danger"){
-    return {width:"100%",padding:"12px",background:isDarkTheme?"#2a0d0d":"#fde8e6",color:C.accent,border:`1px solid ${C.accent}`,borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"block"};
-  }
-  if(kind==="ghost"){
-    return {width:"100%",padding:"12px",background:C.bg,color:C.muted,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"block"};
-  }
-  const bg=kind;
+  const base={width:"100%",padding:"12px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8};
+  if(kind==="danger") return {...base,background:DANGER_BG,color:C.accent,border:`1px solid ${C.accent}`};
+  if(kind==="ghost")  return {...base,background:C.bg,color:C.muted,border:`1px solid ${C.border}`};
   const onGoldBgs=[C.gold,C.gold2];
-  const color=onGoldBgs.includes(bg)?ON_GOLD:ON_DARK;
-  return {width:"100%",padding:"12px",background:bg,color,border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"block"};
+  const color=onGoldBgs.includes(kind)?ON_GOLD:ON_DARK;
+  return {...base,background:kind,color,border:"none"};
 }
