@@ -1,30 +1,31 @@
 const config = {
   appName: "勤怠管理システム",
   brandName: "UDON RESTAURANT",
-  emoji: "🍜",
-  themeColor: "#2d1a0e",
+  emoji: "🍜",                 // legacy fallback only — UI now uses the 勤 seal / line icons
+  themeColor: "#2a2017",
   adminPassword: "udon2024",
   storeLat: 34.9980,
   storeLng: 135.7780,
   storeRadiusM: 150,
   storeAddress: "東山区日吉町",
+  // —— 和モダン (warm washi, light) ——
   theme: {
-    bg: "#fdf6ee",
-    paper: "#fffaf3",
-    surface2: "#f5e9d6",
-    ink: "#2d1a0e",
-    muted: "#8b6f5a",
-    accent: "#c0392b",
-    gold: "#d4a843",
-    gold2: "#e8c97a",
-    green: "#2d7a4f",
-    greenBg: "#d1fae5",
-    greenBorder: "#a7f3d0",
-    border: "#e8d5bc",
-    border2: "#e8d5bc",
-    shadow: "0 2px 12px rgba(45,26,14,0.09)",
-    blue: "#2563eb",
-    blueBg: "#e0e7ff",
+    bg: "#f4ecde",          // washi 紙
+    paper: "#fffdf8",       // card surface
+    surface2: "#efe6d4",    // sunken panel / header band / avatar
+    ink: "#2a2017",         // sumi 墨
+    muted: "#968471",       // secondary text / labels
+    accent: "#c0402e",      // 朱 vermilion — primary accent / clock-out
+    gold: "#ab8338",        // 金 brass — highlight / today / brand
+    gold2: "#cdab6c",
+    green: "#587a4f",       // 抹茶 matcha — working / positive
+    greenBg: "#e8efdf",
+    greenBorder: "#cfe0c2",
+    border: "#e7dcc7",      // hairline
+    border2: "#f0e8d8",     // inner divider
+    shadow: "0 2px 14px rgba(54,38,20,0.08)",
+    blue: "#3a5780",        // 藍 indigo — clock-in / info
+    blueBg: "#e7ecf2",
   },
 };
 
