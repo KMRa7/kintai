@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import CONFIG from "@config";
 import { createClient } from "@supabase/supabase-js";
 import { Icon } from "./Icon";
@@ -778,8 +778,8 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
   const [gpsMsg,setGpsMsg]=useState("");
   const [punching,setPunching]=useState(false);
   const [pendingType,setPendingType]=useState(null);
-  const watchRef = React.useRef(null);
-  const doneRef = React.useRef(false);
+  const watchRef = useRef(null);
+  const doneRef = useRef(false);
   const today=new Date();
   const att=selected?getAtt(selected.id,today):null;
   const shift=selected?getShiftByDate(today,selected.id):null;
@@ -831,7 +831,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
     setTimeout(finish, SAMPLE_MS);
   }
 
-  React.useEffect(()=>()=>{ if(watchRef.current!=null) navigator.geolocation.clearWatch(watchRef.current); },[]);
+  useEffect(()=>()=>{ if(watchRef.current!=null) navigator.geolocation.clearWatch(watchRef.current); },[]);
 
   function handlePunch(type, skipGps=false){
     if(skipGps){ doPunch(type); return; }
