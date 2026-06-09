@@ -16,6 +16,8 @@ const TIME_SLOTS = [
   "16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30",
   "20:00","20:30","21:00","21:30","22:00",
 ];
+// 15-minute increments — used by the staff shift-request form
+const TIME_SLOTS_15 = (()=>{const a=[];for(let m=8*60;m<=22*60;m+=15)a.push(`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`);return a;})();
 const STORE_LAT = CONFIG.storeLat, STORE_LNG = CONFIG.storeLng, STORE_RADIUS_M = CONFIG.storeRadiusM;
 
 // —— type system (和モダン) ——
@@ -1544,8 +1546,8 @@ function StaffRequestView({currentUser,period,getRequest,saveRequest,deleteReque
           </div>
           {editVal.type==="work"&&(
             <div style={{display:"flex",gap:12,marginBottom:20}}>
-              <label style={LS}>{t("inTime")}<select value={editVal.start} onChange={e=>setEditVal(v=>({...v,start:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
-              <label style={LS}>{t("outTime")}<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
+              <label style={LS}>{t("inTime")}<select value={editVal.start} onChange={e=>setEditVal(v=>({...v,start:e.target.value}))} style={SS}>{TIME_SLOTS_15.map(x=><option key={x}>{x}</option>)}</select></label>
+              <label style={LS}>{t("outTime")}<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS_15.map(x=><option key={x}>{x}</option>)}</select></label>
             </div>
           )}
           <button onClick={save} disabled={saving} style={PB(C.ink)}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
