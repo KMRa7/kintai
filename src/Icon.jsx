@@ -34,6 +34,9 @@ const PATHS = {
   chevR:    '<path d="M9.5 5L16 12l-6.5 7"/>',
   warn:     '<path d="M12 3.5L21 19H3L12 3.5Z"/><path d="M12 10v4"/><circle cx="12" cy="16.6" r="1"/>',
   download: '<path d="M12 4v10M8 10.5l4 4 4-4"/><path d="M5 19.5h14"/>',
+  refresh:  '<path d="M20 11a8 8 0 1 0-.7 4.5"/><path d="M20 5v5h-5"/>',
+  settings: '<path d="M3.5 7.5h7M14.5 7.5h6M3.5 16.5h3M10.5 16.5h10"/><circle cx="12.5" cy="7.5" r="2.4"/><circle cx="8" cy="16.5" r="2.4"/>',
+  train:    '<rect x="5.5" y="3.5" width="13" height="13" rx="3.5"/><path d="M5.5 11h13"/><circle cx="9" cy="13.7" r="0.9"/><circle cx="15" cy="13.7" r="0.9"/><path d="M9 16.5L7 20.5M15 16.5l2 4"/>',
 };
 
 export function Icon({ name, size = 18, stroke = 1.6, style, className }) {
