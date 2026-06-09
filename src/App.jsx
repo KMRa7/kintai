@@ -71,6 +71,18 @@ function getWeekDates(offset=0){
   mon.setDate(today.getDate()-((today.getDay()+6)%7)+offset*7);
   return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
 }
+// generalized period: "week" (7d, Mon-anchored), "2week" (14d), "month" (calendar month)
+function getPeriodDates(kind,offset=0){
+  const today=new Date(); today.setHours(0,0,0,0);
+  if(kind==="month"){
+    const base=new Date(today.getFullYear(),today.getMonth()+offset,1);
+    const n=new Date(base.getFullYear(),base.getMonth()+1,0).getDate();
+    return Array.from({length:n},(_,i)=>new Date(base.getFullYear(),base.getMonth(),i+1));
+  }
+  const len=kind==="2week"?14:7;
+  const mon=new Date(today); mon.setDate(today.getDate()-((today.getDay()+6)%7)+offset*len);
+  return Array.from({length:len},(_,i)=>{const d=new Date(mon); d.setDate(mon.getDate()+i); return d;});
+}
 function toDateStr(d){ return d.toISOString().split("T")[0]; }
 function fmtDate(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 function fmtHM(ts){ if(!ts) return "──"; const d=new Date(ts); return d.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}); }
@@ -95,8 +107,46 @@ function csvBtnStyle(){
 
 function parseBreaks(raw){
   if(!raw) return [];
-  try{ const a=typeof raw==="string"?JSON.parse(raw):raw; return Array.isArray(a)?a.filter(x=>Array.isArray(x)&&x.length===2):[]; }
-  catch{ return []; }
+  try{
+    const a=typeof raw==="string"?JSON.parse(raw):raw;
+    if(Array.isArray(a)) return a.filter(x=>Array.isArray(x)&&x.length===2);
+    if(a&&typeof a==="object"&&Array.isArray(a.default)) return a.default.filter(x=>Array.isArray(x)&&x.length===2);
+    return [];
+  }catch{ return []; }
+}
+// break config — legacy array applies to every day; object form {default:[[..]], byDay:{dow:[[..]]}}
+function parseBreakConfig(raw){
+  let v=raw;
+  if(!v) return {default:[],byDay:{}};
+  try{ if(typeof v==="string") v=JSON.parse(v); }catch{ return {default:[],byDay:{}}; }
+  const clean=arr=>Array.isArray(arr)?arr.filter(x=>Array.isArray(x)&&x.length===2):[];
+  if(Array.isArray(v)) return {default:clean(v),byDay:{}};
+  if(v&&typeof v==="object"){
+    const byDay={};
+    if(v.byDay&&typeof v.byDay==="object") for(const k of Object.keys(v.byDay)) byDay[k]=clean(v.byDay[k]);
+    return {default:clean(v.default),byDay};
+  }
+  return {default:[],byDay:{}};
+}
+function breaksForDate(raw,date){
+  const cfg=parseBreakConfig(raw), dow=date.getDay();
+  return (cfg.byDay&&cfg.byDay[dow]!==undefined)?cfg.byDay[dow]:cfg.default;
+}
+function hasPerDayBreaks(raw){ return Object.keys(parseBreakConfig(raw).byDay||{}).length>0; }
+// transport (交通費): fixed monthly default + optional per-month override
+function ymOf(year,month){ return `${year}-${String(month+1).padStart(2,"0")}`; }
+function parseTransportOverrides(raw){
+  if(!raw) return {};
+  try{ const v=typeof raw==="string"?JSON.parse(raw):raw; return (v&&typeof v==="object"&&!Array.isArray(v))?v:{}; }catch{ return {}; }
+}
+function transportForMonth(s,ym){
+  const ov=parseTransportOverrides(s?.transport_overrides);
+  if(ov[ym]!=null&&ov[ym]!=="") return Number(ov[ym])||0;
+  return Number(s?.transport_fixed)||0;
+}
+function hasTransportOverride(s,ym){
+  const ov=parseTransportOverrides(s?.transport_overrides);
+  return ov[ym]!=null&&ov[ym]!=="";
 }
 function breaksTotalMin(breaks){ return breaks.reduce((s,[a,b])=>s+Math.max(0,b-a),0); }
 function breakMinutesInWindow(breaks,startMin,endMin){
@@ -171,23 +221,28 @@ function AppInner(){
   const [shifts, setShifts] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [settings, setSettings] = useState(()=>{ try{ return JSON.parse(localStorage.getItem("kintai_settings"))||{}; }catch{ return {}; } });
+  useEffect(()=>{ try{ localStorage.setItem("kintai_settings",JSON.stringify(settings)); }catch{} },[settings]);
 
   useEffect(()=>{ const tm=setInterval(()=>setNow(new Date()),1000); return ()=>clearInterval(tm); },[]);
 
   const loadAll = useCallback(async()=>{
     setLoading(true);
-    const [s,sh,at,tp] = await Promise.all([
+    const [s,sh,at,tp,rq] = await Promise.all([
       supabase.from("staff").select("*").order("id"),
       supabase.from("shifts").select("*"),
       supabase.from("attendance").select("*"),
       supabase.from("break_templates").select("*").order("id"),
+      supabase.from("shift_requests").select("*"),
     ]);
     if(s.data) setStaff(s.data);
     if(sh.data) setShifts(sh.data);
     if(at.data) setAttendance(at.data);
     if(tp.data) setTemplates(tp.data);
+    if(rq.data) setRequests(rq.data);
     setLoading(false);
   },[]);
 
@@ -224,6 +279,28 @@ function AppInner(){
     await supabase.from("shifts").delete().eq("id",existing.id);
     setShifts(p=>p.filter(s=>s.id!==existing.id));
     showToast(t("t_shiftDeleted"));
+  }
+
+  // —— shift requests (staff side) ——
+  function getRequest(staffId,date){ const ds=toDateStr(date); return requests.find(r=>r.staff_id===staffId&&r.date===ds)||null; }
+  async function saveRequest(staffId,date,type,startTime,endTime){
+    const ds=toDateStr(date);
+    const existing=requests.find(r=>r.staff_id===staffId&&r.date===ds);
+    const payload={status:type,start_time:type==="work"?startTime:null,end_time:type==="work"?endTime:null};
+    if(existing){
+      const {data}=await supabase.from("shift_requests").update(payload).eq("id",existing.id).select().single();
+      if(data) setRequests(p=>p.map(r=>r.id===existing.id?data:r));
+    } else {
+      const {data}=await supabase.from("shift_requests").insert({staff_id:staffId,date:ds,...payload}).select().single();
+      if(data) setRequests(p=>[...p,data]);
+    }
+  }
+  async function deleteRequest(staffId,date){
+    const ds=toDateStr(date);
+    const existing=requests.find(r=>r.staff_id===staffId&&r.date===ds);
+    if(!existing) return;
+    await supabase.from("shift_requests").delete().eq("id",existing.id);
+    setRequests(p=>p.filter(r=>r.id!==existing.id));
   }
 
   function getAtt(staffId,date){
@@ -281,8 +358,8 @@ function AppInner(){
     setAttendance(p=>p.filter(a=>a.id!==existing.id));
   }
 
-  async function addStaff(name,username,password,wage,breaks){
-    const {data}=await supabase.from("staff").insert({name,username,password,wage,breaks:JSON.stringify(breaks||[])}).select().single();
+  async function addStaff(name,username,password,wage,breaks,transportFixed){
+    const {data}=await supabase.from("staff").insert({name,username,password,wage,breaks:JSON.stringify(breaks||[]),transport_fixed:transportFixed||0,transport_overrides:"{}"}).select().single();
     if(data){ setStaff(p=>[...p,data]); showToast(t("t_accIssued",name)); }
   }
   async function deleteStaff(id){
@@ -293,6 +370,7 @@ function AppInner(){
   async function updateStaff(id,fields){
     const payload={...fields};
     if(payload.breaks!==undefined) payload.breaks=JSON.stringify(payload.breaks||[]);
+    if(payload.transport_overrides!==undefined) payload.transport_overrides=JSON.stringify(payload.transport_overrides||{});
     const {data}=await supabase.from("staff").update(payload).eq("id",id).select().single();
     if(data){ setStaff(p=>p.map(s=>s.id===id?data:s)); showToast(t("t_accUpdated")); }
   }
@@ -359,11 +437,14 @@ function AppInner(){
           editAttendance={editAttendance} clearAttendanceDay={clearAttendanceDay}
           addStaff={addStaff} deleteStaff={deleteStaff} updateStaff={updateStaff}
           templates={templates} addTemplate={addTemplate} updateTemplate={updateTemplate} deleteTemplate={deleteTemplate}
+          settings={settings} setSettings={setSettings}
+          requests={requests} getRequest={getRequest}
           showToast={showToast} now={now}/>
       ):(
         <UserLayout tab={tab} setTab={setTab} currentUser={currentUser} now={now}
           getAtt={getAtt} punchIn={punchIn} punchOut={punchOut}
-          getShiftByDate={getShiftByDate} attendance={attendance}/>
+          getShiftByDate={getShiftByDate} attendance={attendance}
+          settings={settings} getRequest={getRequest} saveRequest={saveRequest} deleteRequest={deleteRequest} showToast={showToast}/>
       )}
 
       {toast&&(
@@ -438,24 +519,26 @@ function LoginPage({onSuccess,staff}){
   );
 }
 
-function UserLayout({tab,setTab,currentUser,now,getAtt,punchIn,punchOut,getShiftByDate,attendance}){
+function UserLayout({tab,setTab,currentUser,now,getAtt,punchIn,punchOut,getShiftByDate,attendance,settings,getRequest,saveRequest,deleteRequest,showToast}){
   const {t}=useI18n();
   const tabStyle=(active)=>({flex:1,padding:"11px 4px 9px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`2.5px solid ${C.accent}`:"2.5px solid transparent",color:active?C.accent:C.muted,fontFamily:SANS,fontSize:11,fontWeight:active?700:500,display:"flex",flexDirection:"column",alignItems:"center",gap:4});
   return (
     <>
       <nav style={{display:"flex",background:C.surface2,borderBottom:`1px solid ${C.border}`}}>
         <button onClick={()=>setTab("punch")} style={tabStyle(tab==="punch")}><Icon name="clock" size={18}/>{t("tab_punch")}</button>
+        <button onClick={()=>setTab("request")} style={tabStyle(tab==="request")}><Icon name="calendar" size={18}/>{t("tab_request")}</button>
         <button onClick={()=>setTab("record")} style={tabStyle(tab==="record")}><Icon name="chart" size={18}/>{t("tab_record")}</button>
       </nav>
       <main style={{maxWidth:820,margin:"0 auto",padding:"18px 14px 60px"}}>
         {tab==="punch" && <PunchView staff={[currentUser]} now={now} getAtt={getAtt} punchIn={punchIn} punchOut={punchOut} getShiftByDate={getShiftByDate} singleUser={true}/>}
+        {tab==="request" && <StaffRequestView currentUser={currentUser} period={settings.requestPeriod||"week"} getRequest={getRequest} saveRequest={saveRequest} deleteRequest={deleteRequest} getShiftByDate={getShiftByDate} showToast={showToast}/>}
         {tab==="record" && <MyRecordView currentUser={currentUser} getAtt={getAtt} getShiftByDate={getShiftByDate} attendance={attendance}/>}
       </main>
     </>
   );
 }
 
-function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,attendance,getAtt,punchIn,punchOut,editAttendance,clearAttendanceDay,addStaff,deleteStaff,updateStaff,templates,addTemplate,updateTemplate,deleteTemplate,showToast,now}){
+function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,attendance,getAtt,punchIn,punchOut,editAttendance,clearAttendanceDay,addStaff,deleteStaff,updateStaff,templates,addTemplate,updateTemplate,deleteTemplate,settings,setSettings,requests,getRequest,showToast,now}){
   const {t}=useI18n();
   const TABS=[
     {id:"shift",icon:"calendar",label:t("tab_shift")},
@@ -465,6 +548,7 @@ function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,atte
     {id:"wage",icon:"yen",label:t("tab_wage")},
     {id:"breaks",icon:"coffee",label:t("tab_breaks")},
     {id:"accounts",icon:"users",label:t("tab_accounts")},
+    {id:"settings",icon:"settings",label:t("tab_settings")},
   ];
   const tabStyle=(active)=>({flex:1,padding:"10px 2px 8px",border:"none",cursor:"pointer",background:active?C.paper:"transparent",borderBottom:active?`2.5px solid ${C.accent}`:"2.5px solid transparent",color:active?C.accent:C.muted,fontFamily:SANS,fontSize:10,fontWeight:active?700:500,whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:3});
   return (
@@ -473,13 +557,14 @@ function AdminLayout({tab,setTab,staff,getShiftByDate,saveShift,deleteShift,atte
         {TABS.map(tt=><button key={tt.id} onClick={()=>setTab(tt.id)} style={tabStyle(tab===tt.id)}><Icon name={tt.icon} size={16}/>{tt.label}</button>)}
       </nav>
       <main style={{maxWidth:900,margin:"0 auto",padding:"18px 14px 60px"}}>
-        {tab==="shift"    && <ShiftInputView staff={staff} getShiftByDate={getShiftByDate} saveShift={saveShift} deleteShift={deleteShift}/>}
+        {tab==="shift"    && <ShiftInputView staff={staff} getShiftByDate={getShiftByDate} saveShift={saveShift} deleteShift={deleteShift} period={settings.shiftPeriod||"week"} getRequest={getRequest} showToast={showToast}/>}
         {tab==="punch"    && <PunchView staff={staff} now={now} getAtt={getAtt} punchIn={punchIn} punchOut={punchOut} getShiftByDate={getShiftByDate} singleUser={false}/>}
         {tab==="compare"  && <CompareView staff={staff} attendance={attendance} getShiftByDate={getShiftByDate} getAtt={getAtt}/>}
         {tab==="edit"     && <AttendanceEditView staff={staff} attendance={attendance} editAttendance={editAttendance} clearAttendanceDay={clearAttendanceDay} showToast={showToast} getShiftByDate={getShiftByDate}/>}
         {tab==="wage"     && <WageView staff={staff} attendance={attendance} getShiftByDate={getShiftByDate} updateStaff={updateStaff} showToast={showToast}/>}
         {tab==="breaks"   && <BreakTemplateView templates={templates} addTemplate={addTemplate} updateTemplate={updateTemplate} deleteTemplate={deleteTemplate}/>}
         {tab==="accounts" && <AccountsView staff={staff} addStaff={addStaff} deleteStaff={deleteStaff} updateStaff={updateStaff} templates={templates}/>}
+        {tab==="settings" && <SettingsView settings={settings} setSettings={setSettings} showToast={showToast}/>}
       </main>
     </>
   );
@@ -500,21 +585,22 @@ function verdictOf(sh,att){
   return              {vk:"normal",...VD.normal};
 }
 
-function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today}){
+function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today,transport=0}){
   const {t}=useI18n();
   const DAYS=t.arr("daysSun");
   const monthTotal=monthDates.reduce((acc,d)=>{
     const sh=getShiftByDate(d,s.id),att=getAtt(s.id,d);
-    const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.breaks):0;
+    const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,breaksForDate(s.breaks,d)):0;
     return {mins:acc.mins+mins,pay:acc.pay+Math.floor(mins/60*(s.wage||0))};
   },{mins:0,pay:0});
   return (
     <>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
-        {[[t("s_days"),`${monthDates.filter(d=>{const a=getAtt(s.id,d);return a?.clock_in&&a?.clock_out;}).length}${t("dUnit")}`,C.green],[t("s_hours"),`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],[t("s_pay"),`¥${monthTotal.pay.toLocaleString()}`,C.accent]].map(([label,val,color])=>(
+        {[[t("s_days"),`${monthDates.filter(d=>{const a=getAtt(s.id,d);return a?.clock_in&&a?.clock_out;}).length}${t("dUnit")}`,C.green],[t("s_hours"),`${Math.floor(monthTotal.mins/60)}h${monthTotal.mins%60}m`,C.ink],[t("s_pay"),`¥${(monthTotal.pay+transport).toLocaleString()}`,C.accent,transport>0?t("transport_incl",transport):null]].map(([label,val,color,sub])=>(
           <div key={label} style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:11,padding:"11px 8px",textAlign:"center"}}>
             <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{label}</div>
             <div style={{fontSize:18,fontWeight:600,color,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>{val}</div>
+            {sub&&<div style={{fontSize:9,color:C.muted,marginTop:2}}>{sub}</div>}
           </div>
         ))}
       </div>
@@ -526,7 +612,7 @@ function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today})
           <tbody>
             {monthDates.map((d,i)=>{
               const sh=getShiftByDate(d,s.id),att=getAtt(s.id,d),vd=verdictOf(sh,att);
-              const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.breaks):0;
+              const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,breaksForDate(s.breaks,d)):0;
               const isWE=d.getDay()===0||d.getDay()===6,isToday=d.toDateString()===today.toDateString();
               return (
                 <tr key={i} style={{borderBottom:`1px solid ${C.border2}`,background:isToday?C.surface2:i%2===0?ROW_A:ROW_B}}>
@@ -544,7 +630,7 @@ function MonthTable({staff:s,getShiftByDate,getAtt,year,month,monthDates,today})
           <tfoot><tr style={{background:HEAD_BG,color:HEAD_FG}}>
             <td colSpan={5} style={{padding:"11px 12px",fontWeight:700,fontSize:12}}>{t("s_monthTotal")}</td>
             <td style={{padding:"11px 6px",textAlign:"center",color:C.gold,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{Math.floor(monthTotal.mins/60)}h{monthTotal.mins%60}m</td>
-            <td style={{padding:"11px 6px",textAlign:"center",color:C.gold,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>¥{monthTotal.pay.toLocaleString()}</td>
+            <td style={{padding:"11px 6px",textAlign:"center",color:C.gold,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>¥{(monthTotal.pay+transport).toLocaleString()}</td>
           </tr></tfoot>
         </table>
       </div>
@@ -565,28 +651,43 @@ function MyRecordView({currentUser,getAtt,getShiftByDate}){
     <div>
       <SectionTitle icon="chart" title={t("rec_title")} sub={t("rec_sub",brkTotal)}/>
       <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
-      <MonthTable staff={s} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today}/>
+      <MonthTable staff={s} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today} transport={transportForMonth(s,ymOf(year,month))}/>
     </div>
   );
 }
 
-function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
+function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift,period,getRequest,showToast}){
   const {t}=useI18n();
-  const DAYS=t.arr("days");
+  const DAYS=t.arr("daysSun");
+  const isMonth=period==="month";
   const [weekOffset,setWeekOffset]=useState(0);
+  const [moOffset,setMoOffset]=useState(0);
   const [modal,setModal]=useState(null);
   const [editVal,setEditVal]=useState({start:"10:00",end:"18:00"});
   const [saving,setSaving]=useState(false);
-  const dates=getWeekDates(weekOffset);
+  const today=new Date();
+  const mBase=new Date(today.getFullYear(),today.getMonth()+moOffset,1);
+  const dates=isMonth
+    ? Array.from({length:new Date(mBase.getFullYear(),mBase.getMonth()+1,0).getDate()},(_,i)=>new Date(mBase.getFullYear(),mBase.getMonth(),i+1))
+    : getWeekDates(weekOffset);
+  const reqOf=(staffId,d)=>getRequest?getRequest(staffId,d):null;
+  const pendingCount=getRequest?staff.reduce((n,s)=>n+dates.filter(d=>{const rq=getRequest(s.id,d);return rq&&!getShiftByDate(d,s.id);}).length,0):0;
 
   function openModal(staffId,dayIdx){
-    const sh=getShiftByDate(dates[dayIdx],staffId);
-    setEditVal(sh?{start:sh.start_time,end:sh.end_time}:{start:"10:00",end:"18:00"});
-    setModal({staffId,dayIdx});
+    const d=dates[dayIdx];
+    const sh=getShiftByDate(d,staffId);
+    const req=reqOf(staffId,d);
+    setEditVal(sh?{start:sh.start_time,end:sh.end_time}:(req&&req.status==="work"?{start:req.start_time,end:req.end_time}:{start:"10:00",end:"18:00"}));
+    setModal({staffId,dayIdx,req});
   }
   async function save(){
     setSaving(true);
     await saveShift(modal.staffId,dates[modal.dayIdx],editVal.start,editVal.end);
+    setSaving(false); setModal(null);
+  }
+  async function approve(){
+    setSaving(true);
+    await saveShift(modal.staffId,dates[modal.dayIdx],modal.req.start_time,modal.req.end_time);
     setSaving(false); setModal(null);
   }
   async function remove(){
@@ -595,46 +696,69 @@ function ShiftInputView({staff,getShiftByDate,saveShift,deleteShift}){
     setSaving(false); setModal(null);
   }
 
+  const colW=isMonth?46:70;
+  const nameW=isMonth?92:88;
   return (
     <div>
       <SectionTitle icon="calendar" title={t("shift_title")} sub={t("shift_sub")}/>
-      <WeekNav dates={dates} offset={weekOffset} setOffset={setWeekOffset}/>
+      {pendingCount>0&&<div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:12,padding:"6px 12px",borderRadius:20,background:isDarkTheme?"#241d0a":"#f4ecd6",color:C.gold,fontSize:11.5,fontWeight:700}}><Icon name="signal" size={13}/>{t("req_adminCount",pendingCount)}</div>}
+      {isMonth
+        ? <WeekNavMonth year={mBase.getFullYear()} month={mBase.getMonth()} offset={moOffset} setOffset={setMoOffset}/>
+        : <WeekNav dates={dates} offset={weekOffset} setOffset={setWeekOffset}/>}
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:560}}>
+        <table style={{width:"100%",borderCollapse:"collapse",background:C.paper,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,fontSize:12,minWidth:isMonth?nameW+dates.length*colW:560}}>
           <thead><tr style={{background:HEAD_BG,color:HEAD_FG}}>
-            <th style={{padding:"10px 12px",textAlign:"left",width:88,fontWeight:700}}>{t("col_staff")}</th>
-            {dates.map((d,i)=><th key={i} style={{padding:"10px 6px",textAlign:"center",color:i>=5?C.gold:HEAD_FG,minWidth:70,fontWeight:700}}><div>{DAYS[i]}</div><div style={{fontSize:10,opacity:0.7,fontWeight:400}}>{fmtDate(d)}</div></th>)}
+            <th style={{padding:"10px 12px",textAlign:"left",width:nameW,minWidth:nameW,fontWeight:700,position:"sticky",left:0,background:HEAD_BG,zIndex:2}}>{t("col_staff")}</th>
+            {dates.map((d,i)=>{const we=d.getDay()===0||d.getDay()===6;return <th key={i} style={{padding:"10px 4px",textAlign:"center",color:we?C.gold:HEAD_FG,minWidth:colW,fontWeight:700}}><div>{DAYS[d.getDay()]}</div><div style={{fontSize:10,opacity:0.7,fontWeight:400}}>{isMonth?d.getDate():fmtDate(d)}</div></th>;})}
           </tr></thead>
           <tbody>
-            {staff.map((s,si)=>(
-              <tr key={s.id} style={{borderBottom:`1px solid ${C.border}`,background:si%2===0?ROW_A:ROW_B}}>
-                <td style={{padding:"10px",fontWeight:700}}>
+            {staff.map((s,si)=>{
+              const rowBg=si%2===0?ROW_A:ROW_B;
+              return (
+              <tr key={s.id} style={{borderBottom:`1px solid ${C.border}`,background:rowBg}}>
+                <td style={{padding:"10px",fontWeight:700,position:"sticky",left:0,background:rowBg,zIndex:1}}>
                   <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:"50%",background:SUBTLE,color:C.muted,fontSize:11,fontWeight:600,marginRight:6,fontFamily:SERIF}}>{nameToAvatar(s.name)}</span>
                   {s.name.split(" ")[0]}
                 </td>
                 {dates.map((_,dayIdx)=>{
-                  const sh=getShiftByDate(dates[dayIdx],s.id);
+                  const d=dates[dayIdx];
+                  const sh=getShiftByDate(d,s.id);
+                  const req=reqOf(s.id,d);
+                  const reqDiffers=req&&req.status==="work"&&!(sh&&sh.start_time===req.start_time&&sh.end_time===req.end_time);
                   return (
-                    <td key={dayIdx} style={{padding:"5px 4px",textAlign:"center"}}>
+                    <td key={dayIdx} style={{padding:"5px 3px",textAlign:"center"}}>
                       {sh?(
-                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"6px 2px",borderRadius:8,border:`1px solid ${C.greenBorder}`,background:C.greenBg,color:C.green,fontSize:10.5,fontWeight:700,cursor:"pointer",fontFamily:SANS,lineHeight:1.5,fontVariantNumeric:"tabular-nums"}}>
+                        <button onClick={()=>openModal(s.id,dayIdx)} style={{position:"relative",width:"100%",padding:"6px 1px",borderRadius:8,border:`1px solid ${C.greenBorder}`,background:C.greenBg,color:C.green,fontSize:isMonth?9.5:10.5,fontWeight:700,cursor:"pointer",fontFamily:SANS,lineHeight:1.5,fontVariantNumeric:"tabular-nums"}}>
                           {sh.start_time}<br/>〜{sh.end_time}
+                          {(req&&(reqDiffers||req.status==="off"))&&<span style={{position:"absolute",top:3,right:3,width:6,height:6,borderRadius:"50%",background:C.gold}}/>}
+                        </button>
+                      ):req?(
+                        <button onClick={()=>openModal(s.id,dayIdx)} title={t("req_pending")} style={{width:"100%",padding:"5px 1px",borderRadius:8,border:`1.5px dashed ${req.status==="off"?C.accent:C.gold}`,background:"transparent",color:req.status==="off"?C.accent:C.gold,fontSize:isMonth?9:10,fontWeight:700,cursor:"pointer",fontFamily:SANS,lineHeight:1.4,fontVariantNumeric:"tabular-nums"}}>
+                          {req.status==="work"?<>{req.start_time}<br/>〜{req.end_time}</>:t("req_offShort")}
+                          <div style={{fontSize:isMonth?7.5:8.5,opacity:0.85,fontWeight:700,letterSpacing:"0.04em"}}>{t("req_pending")}</div>
                         </button>
                       ):(
-                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:"12px 0",border:`1.5px dashed ${C.border}`,borderRadius:8,background:"transparent",color:C.muted,cursor:"pointer",display:"inline-flex",justifyContent:"center"}}><Icon name="plus" size={15}/></button>
+                        <button onClick={()=>openModal(s.id,dayIdx)} style={{width:"100%",padding:isMonth?"9px 0":"12px 0",border:`1.5px dashed ${C.border}`,borderRadius:8,background:"transparent",color:C.muted,cursor:"pointer",display:"inline-flex",justifyContent:"center"}}><Icon name="plus" size={isMonth?12:15}/></button>
                       )}
                     </td>
                   );
                 })}
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
       {modal&&(
         <Modal onClose={()=>setModal(null)}>
           <div style={{fontSize:15,fontWeight:600,marginBottom:3,fontFamily:SERIF}}>{staff.find(s=>s.id===modal.staffId)?.name}</div>
-          <div style={{fontSize:12,color:C.muted,marginBottom:18}}>{DAYS[modal.dayIdx]}{t("dowSuffix")}（{fmtDate(dates[modal.dayIdx])}）</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:18}}>{DAYS[dates[modal.dayIdx].getDay()]}{t("dowSuffix")}（{fmtDate(dates[modal.dayIdx])}）</div>
+          {modal.req&&(
+            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:16,padding:"10px 12px",borderRadius:10,background:modal.req.status==="off"?DANGER_BG:(isDarkTheme?"#241d0a":"#f4ecd6"),border:`1px solid ${modal.req.status==="off"?C.accent+"55":C.gold+"66"}`}}>
+              <Icon name="user" size={16} style={{color:modal.req.status==="off"?C.accent:C.gold,flexShrink:0}}/>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:modal.req.status==="off"?C.accent:C.gold,fontVariantNumeric:"tabular-nums"}}>{t("req_hope")}: {modal.req.status==="work"?`${modal.req.start_time}〜${modal.req.end_time}`:t("req_off")}</div>
+              {modal.req.status==="work"&&<button onClick={approve} disabled={saving} style={{padding:"6px 11px",borderRadius:8,border:"none",background:C.gold,color:ON_GOLD,fontFamily:SANS,fontSize:11.5,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{t("req_approve")}</button>}
+            </div>
+          )}
           <div style={{display:"flex",gap:12,marginBottom:20}}>
             <label style={LS}>{t("inTime")}<select value={editVal.start} onChange={e=>setEditVal(v=>({...v,start:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
             <label style={LS}>{t("outTime")}<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
@@ -653,33 +777,65 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
   const [gps,setGps]=useState("idle");
   const [gpsMsg,setGpsMsg]=useState("");
   const [punching,setPunching]=useState(false);
+  const [pendingType,setPendingType]=useState(null);
+  const watchRef = React.useRef(null);
+  const doneRef = React.useRef(false);
   const today=new Date();
   const att=selected?getAtt(selected.id,today):null;
   const shift=selected?getShiftByDate(today,selected.id):null;
   const status=!att?.clock_in?"absent":!att?.clock_out?"working":"done";
 
-  async function handlePunch(type, skipGps=false){
-    if(skipGps){
-      setPunching(true);
-      type==="in"?await punchIn(selected.id):await punchOut(selected.id);
-      setPunching(false);
-      return;
+  async function doPunch(type){
+    setPunching(true);
+    type==="in"?await punchIn(selected.id):await punchOut(selected.id);
+    setPunching(false);
+  }
+
+  function evaluateFix(pos, type){
+    const dist=Math.round(calcDistanceM(pos.coords.latitude,pos.coords.longitude,STORE_LAT,STORE_LNG));
+    const acc=Math.round(pos.coords.accuracy||0);
+    // Give the benefit of GPS error, capped at 100m, so a real on-site staff isn't falsely rejected
+    const tolerance=Math.min(acc,100);
+    if(dist-tolerance<=STORE_RADIUS_M){
+      setGps("ok"); setGpsMsg(t("gps_ok2",dist,acc));
+      doPunch(type);
+    } else {
+      setGps("far"); setGpsMsg(t("gps_far2",dist,acc,STORE_RADIUS_M));
     }
-    setGps("checking"); setGpsMsg(t("gps_checking"));
+  }
+
+  // Sample GPS for a few seconds, keep the most accurate fix, finish early on a confident reading.
+  function acquireAndPunch(type){
+    setPendingType(type);
     if(!navigator.geolocation){ setGps("error"); setGpsMsg(t("gps_noSupport")); return; }
-    navigator.geolocation.getCurrentPosition(
-      async pos=>{
-        const dist=calcDistanceM(pos.coords.latitude,pos.coords.longitude,STORE_LAT,STORE_LNG);
-        if(dist<=STORE_RADIUS_M){
-          setGps("ok"); setGpsMsg(t("gps_ok",Math.round(dist)));
-          setPunching(true);
-          type==="in"?await punchIn(selected.id):await punchOut(selected.id);
-          setPunching(false);
-        } else { setGps("error"); setGpsMsg(t("gps_far",Math.round(dist),STORE_RADIUS_M)); }
+    setGps("checking"); setGpsMsg(t("gps_checking"));
+    let best=null; doneRef.current=false;
+    const SAMPLE_MS=8000;
+    const finish=()=>{
+      if(doneRef.current) return; doneRef.current=true;
+      if(watchRef.current!=null){ navigator.geolocation.clearWatch(watchRef.current); watchRef.current=null; }
+      if(!best){ setGps("error"); setGpsMsg(t("gps_timeout")); return; }
+      evaluateFix(best, type);
+    };
+    watchRef.current=navigator.geolocation.watchPosition(
+      pos=>{
+        if(!best || (pos.coords.accuracy||1e9) < (best.coords.accuracy||1e9)) best=pos;
+        const dist=calcDistanceM(best.coords.latitude,best.coords.longitude,STORE_LAT,STORE_LNG);
+        const acc=best.coords.accuracy||0;
+        // confident, clearly-inside fix → stop early
+        if(acc<=30 && dist<=STORE_RADIUS_M) finish();
       },
-      ()=>{ setGps("denied"); setGpsMsg(t("gps_denied")); },
-      {enableHighAccuracy:true,timeout:10000}
+      err=>{ if(!best && !doneRef.current){ doneRef.current=true; if(watchRef.current!=null){navigator.geolocation.clearWatch(watchRef.current);watchRef.current=null;} setGps(err.code===1?"denied":"error"); setGpsMsg(err.code===1?t("gps_denied"):t("gps_timeout")); } },
+      {enableHighAccuracy:true,timeout:SAMPLE_MS,maximumAge:0}
     );
+    setTimeout(finish, SAMPLE_MS);
+  }
+
+  React.useEffect(()=>()=>{ if(watchRef.current!=null) navigator.geolocation.clearWatch(watchRef.current); },[]);
+
+  function handlePunch(type, skipGps=false){
+    if(skipGps){ doPunch(type); return; }
+    acquireAndPunch(type);
   }
 
   const SL={absent:t("st_absent"),working:t("st_working"),done:t("st_done")};
@@ -726,7 +882,7 @@ function PunchView({staff,now,getAtt,punchIn,punchOut,getShiftByDate,singleUser}
               </div>
             ))}
           </div>
-          {gps!=="idle"&&<div style={{marginBottom:14,padding:"10px 14px",borderRadius:10,fontSize:12,fontWeight:700,background:gpsBg,color:gpsColor,display:"flex",alignItems:"center",gap:8}}><Icon name={gpsIcon} size={16}/>{gpsMsg}</div>}
+          {gps!=="idle"&&<div style={{marginBottom:14,padding:"10px 14px",borderRadius:10,fontSize:12,fontWeight:700,background:gpsBg,color:gpsColor,display:"flex",alignItems:"center",gap:8}}><Icon name={gpsIcon} size={16}/><span style={{flex:1}}>{gpsMsg}</span>{(gps==="far"||gps==="error"||gps==="denied")&&<button onClick={()=>acquireAndPunch(pendingType||"in")} style={{border:`1px solid ${gpsColor}`,background:"transparent",color:gpsColor,borderRadius:8,padding:"5px 10px",fontFamily:SANS,fontSize:11,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap",flexShrink:0}}><Icon name="refresh" size={13}/>{t("gps_retry")}</button>}</div>}
           <div style={{display:"flex",gap:10}}>
             <button disabled={!canIn} onClick={()=>handlePunch("in",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:canIn?"none":`1px solid ${C.border}`,background:canIn?C.green:C.surface2,color:canIn?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canIn?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="check" size={16}/>{t("btn_in")}</button>
             <button disabled={!canOut} onClick={()=>handlePunch("out",!singleUser)} style={{flex:1,padding:"13px 0",borderRadius:12,border:canOut?"none":`1px solid ${C.border}`,background:canOut?C.blue:C.surface2,color:canOut?ON_DARK:C.muted,fontSize:13,fontWeight:700,cursor:canOut?"pointer":"not-allowed",fontFamily:SANS,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8}}><Icon name="power" size={16}/>{t("btn_out")}</button>
@@ -777,7 +933,7 @@ function CompareView({staff,getShiftByDate,getAtt}){
     const rows=[header];
     monthDates.forEach(d=>{
       const sh=getShiftByDate(d,selStaff.id),att=getAtt(selStaff.id,d),vd=verdictOf(sh,att);
-      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,selStaff.breaks):0;
+      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,breaksForDate(selStaff.breaks,d)):0;
       rows.push([
         `${year}-${String(month+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`,
         DAYS[d.getDay()],
@@ -799,7 +955,7 @@ function CompareView({staff,getShiftByDate,getAtt}){
         <div style={{fontSize:11,color:C.muted}}>{t("breakLabel")}: <span style={{color:C.gold,fontWeight:700}}>{t("breakTotal",brkTotal)}</span></div>
         <button onClick={exportCSV} style={csvBtnStyle()}><Icon name="download" size={14}/>{t("csv_export")}</button>
       </div>
-      <MonthTable staff={selStaff} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today}/>
+      <MonthTable staff={selStaff} getShiftByDate={getShiftByDate} getAtt={getAtt} year={year} month={month} monthDates={monthDates} today={today} transport={transportForMonth(selStaff,ymOf(year,month))}/>
     </div>
   );
 }
@@ -889,8 +1045,14 @@ function AttendanceEditView({staff,attendance,editAttendance,clearAttendanceDay,
 function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
   const {t}=useI18n();
   const [editing,setEditing]=useState({});
-  const today=new Date(),base=new Date(today.getFullYear(),today.getMonth(),1);
-  const monthDates=Array.from({length:new Date(base.getFullYear(),base.getMonth()+1,0).getDate()},(_,i)=>new Date(base.getFullYear(),base.getMonth(),i+1));
+  const [moOffset,setMoOffset]=useState(0);
+  const [trModal,setTrModal]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const today=new Date();
+  const base=new Date(today.getFullYear(),today.getMonth()+moOffset,1);
+  const year=base.getFullYear(),month=base.getMonth();
+  const ym=ymOf(year,month);
+  const monthDates=Array.from({length:new Date(year,month+1,0).getDate()},(_,i)=>new Date(year,month,i+1));
 
   async function save(staffId,currentWage){
     const v=parseInt(editing[staffId]??currentWage);
@@ -901,53 +1063,108 @@ function WageView({staff,attendance,getShiftByDate,updateStaff,showToast}){
   function monthSummary(s){
     return monthDates.reduce((acc,d)=>{
       const sh=getShiftByDate(d,s.id),att=attendance.find(a=>a.staff_id===s.id&&a.date===toDateStr(d));
-      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,s.breaks):0;
+      const mins=sh&&att?.clock_in&&att?.clock_out?calcBillableMinutes(sh.start_time,sh.end_time,att.clock_in,att.clock_out,breaksForDate(s.breaks,d)):0;
       return {mins:acc.mins+mins,pay:acc.pay+Math.floor(mins/60*(s.wage||0))};
     },{mins:0,pay:0});
   }
+  function openTransport(s){
+    setTrModal({staffId:s.id,fixed:String(Number(s.transport_fixed)||0),override:hasTransportOverride(s,ym),monthAmt:String(transportForMonth(s,ym))});
+  }
+  async function saveTransport(){
+    const sid=trModal.staffId, st=staff.find(x=>x.id===sid);
+    const ov=parseTransportOverrides(st.transport_overrides);
+    if(trModal.override) ov[ym]=Number(trModal.monthAmt)||0; else delete ov[ym];
+    setSaving(true);
+    await updateStaff(sid,{transport_fixed:Number(trModal.fixed)||0,transport_overrides:ov});
+    setSaving(false); setTrModal(null);
+  }
 
+  const GRID="1fr 72px 80px 116px 116px 110px";
   return (
     <div>
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
         <SectionTitle icon="yen" title={t("wage_title")} sub={t("wage_sub")}/>
         <button onClick={()=>{
-          const header=[t("col_staff"),t("col_uname"),t("w_hourly"),t("csv_workedMin"),t("w_pay"),t("csv_breakMin")];
+          const header=[t("col_staff"),t("col_uname"),t("w_hourly"),t("csv_workedMin"),t("w_workPay"),t("w_transport"),t("w_total"),t("csv_breakMin")];
           const rows=[header];
-          staff.forEach(s=>{ const sum=monthSummary(s); rows.push([s.name,s.username,s.wage||0,sum.mins,sum.pay,breaksTotalMin(parseBreaks(s.breaks))]); });
-          const ym=`${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,"0")}`;
+          staff.forEach(s=>{ const sum=monthSummary(s); const tr=transportForMonth(s,ym); rows.push([s.name,s.username,s.wage||0,sum.mins,sum.pay,tr,sum.pay+tr,breaksTotalMin(parseBreaks(s.breaks))]); });
           downloadCSV(`kintai_wage_${ym}.csv`, rows);
         }} style={{...csvBtnStyle(),marginTop:2,flexShrink:0}}><Icon name="download" size={14}/>{t("csv_export")}</button>
       </div>
-      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow}}>
-        <div style={{background:HEAD_BG,padding:"10px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center"}}>
-          <span>{t("col_staff")}</span><span style={{textAlign:"right"}}>{t("w_hourly")}</span><span style={{textAlign:"center"}}>{t("w_worked")}</span><span style={{textAlign:"right"}}>{t("w_pay")}</span><span style={{textAlign:"center"}}>{t("w_change")}</span>
+      <WeekNavMonth year={year} month={month} offset={moOffset} setOffset={setMoOffset}/>
+      <div style={{overflowX:"auto"}}>
+      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,minWidth:660}}>
+        <div style={{background:HEAD_BG,padding:"10px 14px",fontSize:11,fontWeight:700,color:C.muted,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:GRID,gap:8,alignItems:"center"}}>
+          <span>{t("col_staff")}</span><span style={{textAlign:"right"}}>{t("w_hourly")}</span><span style={{textAlign:"center"}}>{t("w_worked")}</span><span style={{textAlign:"center"}}>{t("w_transport")}</span><span style={{textAlign:"right"}}>{t("w_total")}</span><span style={{textAlign:"center"}}>{t("w_change")}</span>
         </div>
         {staff.map((s,i)=>{
           const sum=monthSummary(s);
-          const brkTotal=breaksTotalMin(parseBreaks(s.breaks));
+          const tr=transportForMonth(s,ym), isOv=hasTransportOverride(s,ym);
           return (
-            <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 130px 100px 120px",gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border2}`:"none",background:i%2===0?ROW_A:ROW_B}}>
+            <div key={s.id} style={{display:"grid",gridTemplateColumns:GRID,gap:8,alignItems:"center",padding:"12px 14px",borderBottom:i<staff.length-1?`1px solid ${C.border2}`:"none",background:i%2===0?ROW_A:ROW_B}}>
               <div style={{display:"flex",alignItems:"center",gap:9}}>
                 <div style={{width:28,height:28,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,fontFamily:SERIF}}>{nameToAvatar(s.name)}</div>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{s.name}</div>
-                  <div style={{fontSize:10,color:C.muted}}>{t("breaksUnit",brkTotal)}</div>
+                  <div style={{fontSize:10,color:C.muted}}>{t("breaksUnit",breaksTotalMin(parseBreaks(s.breaks)))}</div>
                 </div>
               </div>
               <div style={{textAlign:"right",fontSize:13,fontWeight:600,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{s.wage?.toLocaleString()}</div>
               <div style={{textAlign:"center",fontSize:12,color:C.muted,fontVariantNumeric:"tabular-nums"}}>{Math.floor(sum.mins/60)}h{sum.mins%60}m</div>
-              <div style={{textAlign:"right",fontSize:13,fontWeight:600,color:C.accent,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{sum.pay.toLocaleString()}</div>
-              <div style={{display:"flex",gap:5,alignItems:"center"}}>
+              <div style={{display:"flex",justifyContent:"center"}}>
+                <button onClick={()=>openTransport(s)} title={t("w_transport")} style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:3,padding:"5px 9px",borderRadius:9,border:`1px solid ${isOv?C.gold:C.border}`,background:isOv?(isDarkTheme?"#241d0a":"#f4ecd6"):C.bg,cursor:"pointer",fontFamily:SANS}}>
+                  <span style={{fontSize:12.5,fontWeight:700,color:C.ink,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{tr.toLocaleString()}</span>
+                  <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:10,background:isOv?C.gold:SUBTLE,color:isOv?ON_GOLD:C.muted,display:"inline-flex",alignItems:"center",gap:3}}><Icon name={isOv?"pencil":"train"} size={9}/>{isOv?t("transport_overrideTag"):t("transport_fixedTag")}</span>
+                </button>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13.5,fontWeight:700,color:C.accent,fontFamily:SERIF,fontVariantNumeric:"tabular-nums"}}>¥{(sum.pay+tr).toLocaleString()}</div>
+                <div style={{fontSize:9.5,color:C.muted,fontVariantNumeric:"tabular-nums"}}>{t("w_workPay")} ¥{sum.pay.toLocaleString()}</div>
+              </div>
+              <div style={{display:"flex",gap:5,alignItems:"center",justifyContent:"flex-end"}}>
                 <input type="number" value={editing[s.id]??s.wage??""} min={900} max={5000}
                   onChange={e=>setEditing(p=>({...p,[s.id]:e.target.value}))}
-                  style={{width:65,padding:"6px 7px",borderRadius:7,border:`1px solid ${C.border}`,fontFamily:SANS,fontSize:12,textAlign:"right",outline:"none",background:C.bg,color:C.ink,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
-                <button onClick={()=>save(s.id,s.wage)} style={{padding:"6px 10px",borderRadius:8,border:"none",background:C.gold,color:ON_GOLD,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:SANS,whiteSpace:"nowrap"}}>{t("w_update")}</button>
+                  style={{width:58,padding:"6px 7px",borderRadius:7,border:`1px solid ${C.border}`,fontFamily:SANS,fontSize:12,textAlign:"right",outline:"none",background:C.bg,color:C.ink,WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+                <button onClick={()=>save(s.id,s.wage)} style={{padding:"6px 9px",borderRadius:8,border:"none",background:C.gold,color:ON_GOLD,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:SANS,whiteSpace:"nowrap"}}>{t("w_update")}</button>
               </div>
             </div>
           );
         })}
       </div>
+      </div>
       <div style={{marginTop:11,fontSize:11,color:C.muted}}>{t("wageFoot")}</div>
+      {trModal&&(()=>{ const st=staff.find(x=>x.id===trModal.staffId); return (
+        <Modal onClose={()=>setTrModal(null)}>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:3,fontFamily:SERIF,display:"flex",alignItems:"center",gap:8}}><Icon name="train" size={18} style={{color:C.gold}}/>{t("transport_editTitle",st?.name)}</div>
+          <div style={{fontSize:12,color:C.gold,marginBottom:18,fontWeight:700}}>{t("ym",year,month)}</div>
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("transport_monthFixed")}</label>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:14,color:C.muted}}>¥</span>
+              <input type="number" value={trModal.fixed} onChange={e=>setTrModal(p=>({...p,fixed:e.target.value}))} placeholder={t("f_transportPh")}
+                style={{flex:1,padding:"9px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:SANS,fontSize:14,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",fontVariantNumeric:"tabular-nums",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+            </div>
+          </div>
+          <div style={{borderTop:`1px dashed ${C.border}`,paddingTop:14,marginBottom:6}}>
+            <label style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",fontSize:13,fontWeight:600,marginBottom:trModal.override?12:0}}>
+              <span onClick={()=>setTrModal(p=>({...p,override:!p.override}))} style={{width:42,height:24,borderRadius:14,background:trModal.override?C.gold:C.surface2,border:`1px solid ${trModal.override?C.gold:C.border}`,position:"relative",flexShrink:0,transition:"background .15s"}}><span style={{position:"absolute",top:2,left:trModal.override?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/></span>
+              {t("transport_useOverride")}
+            </label>
+            {trModal.override&&(
+              <div>
+                <label style={{fontSize:11,color:C.muted,display:"block",marginBottom:5,fontWeight:600}}>{t("transport_thisMonth")}</label>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:14,color:C.muted}}>¥</span>
+                  <input type="number" value={trModal.monthAmt} onChange={e=>setTrModal(p=>({...p,monthAmt:e.target.value}))}
+                    style={{flex:1,padding:"9px 12px",borderRadius:8,border:`1.5px solid ${C.gold}`,fontFamily:SANS,fontSize:14,background:C.bg,color:C.ink,outline:"none",boxSizing:"border-box",fontVariantNumeric:"tabular-nums",WebkitTextFillColor:C.ink,WebkitBoxShadow:`0 0 0 100px ${C.bg} inset`}}/>
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{fontSize:11,color:C.muted,margin:"12px 0 18px"}}>{t("transport_note")}</div>
+          <button onClick={saveTransport} disabled={saving} style={PB(C.ink)}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
+        </Modal>
+      ); })()}
     </div>
   );
 }
@@ -987,6 +1204,47 @@ function BreakEditor({breaks,setBreaks,templates,onPickTemplate}){
         </div>
       ))}
       <button onClick={addRow} style={{width:"100%",padding:"9px",marginTop:4,borderRadius:8,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontFamily:SANS,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7}}><Icon name="plus" size={15}/>{t("be_add")}</button>
+    </div>
+  );
+}
+
+function StaffBreakEditor({config,setConfig,templates}){
+  const {t}=useI18n();
+  const DAYS=t.arr("daysSun");
+  const norm=c=>(c&&!Array.isArray(c)&&c.byDay)?{default:c.default||[],byDay:c.byDay||{}}:{default:Array.isArray(c)?c:[],byDay:{}};
+  const cfg=norm(config);
+  const order=[1,2,3,4,5,6,0]; // Mon-first weekday order (getDay values)
+  const used=Object.keys(cfg.byDay).map(Number);
+  const available=order.filter(d=>!used.includes(d));
+  const setDefault=fn=>setConfig(c=>{const n=norm(c);return {...n,default:typeof fn==="function"?fn(n.default):fn};});
+  const setDay=(dow,fn)=>setConfig(c=>{const n=norm(c);const cur=n.byDay[dow]||[];return {...n,byDay:{...n.byDay,[dow]:typeof fn==="function"?fn(cur):fn}};});
+  const addDay=dow=>setConfig(c=>{const n=norm(c);return {...n,byDay:{...n.byDay,[dow]:(n.default||[]).map(r=>[...r])}};});
+  const removeDay=dow=>setConfig(c=>{const n=norm(c);const b={...n.byDay};delete b[dow];return {...n,byDay:b};});
+  return (
+    <div>
+      <div style={{fontSize:11.5,fontWeight:700,marginBottom:2}}>{t("be_baseTitle")}</div>
+      <div style={{fontSize:10.5,color:C.muted,marginBottom:9}}>{t("be_baseSub")}</div>
+      <BreakEditor breaks={cfg.default} setBreaks={setDefault} templates={templates} onPickTemplate={b=>setDefault(b)}/>
+      <div style={{marginTop:16,paddingTop:13,borderTop:`1px dashed ${C.border}`}}>
+        <div style={{fontSize:11.5,fontWeight:700,marginBottom:2,display:"flex",alignItems:"center",gap:6}}><Icon name="calendar" size={13} style={{color:C.gold}}/>{t("be_perDay")}</div>
+        <div style={{fontSize:10.5,color:C.muted,marginBottom:10}}>{t("be_perDaySub")}</div>
+        {order.filter(d=>used.includes(d)).map(dow=>(
+          <div key={dow} style={{border:`1px solid ${C.border}`,borderRadius:10,padding:12,marginBottom:10,background:C.bg}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:9}}>
+              <span style={{fontSize:12.5,fontWeight:700,display:"inline-flex",alignItems:"center",gap:7}}><span style={{width:24,height:24,borderRadius:7,background:C.gold,color:ON_GOLD,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11.5,fontWeight:700,fontFamily:SERIF}}>{DAYS[dow]}</span>{t("be_dayTitle",DAYS[dow])}</span>
+              <button onClick={()=>removeDay(dow)} title={t("delete")} style={{padding:"5px 9px",borderRadius:7,border:`1px solid ${C.accent}55`,background:DANGER_BG,color:C.accent,cursor:"pointer",fontFamily:SANS,fontSize:11,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}><Icon name="x" size={13}/></button>
+            </div>
+            <BreakEditor breaks={cfg.byDay[dow]} setBreaks={fn=>setDay(dow,fn)}/>
+          </div>
+        ))}
+        {available.length>0&&(
+          <select value="" onChange={e=>{if(e.target.value!=="") addDay(Number(e.target.value));}}
+            style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px dashed ${C.border}`,fontFamily:SANS,fontSize:12.5,fontWeight:700,background:"transparent",color:C.muted,outline:"none",boxSizing:"border-box",cursor:"pointer"}}>
+            <option value="">＋ {t("be_addDay")}</option>
+            {available.map(d=><option key={d} value={d}>{t("be_dayTitle",DAYS[d])}</option>)}
+          </select>
+        )}
+      </div>
     </div>
   );
 }
@@ -1070,7 +1328,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
   const {t}=useI18n();
   const [showAdd,setShowAdd]=useState(false);
   const [editId,setEditId]=useState(null);
-  const [form,setForm]=useState({name:"",username:"",password:"",wage:"",breaks:[]});
+  const [form,setForm]=useState({name:"",username:"",password:"",wage:"",transport_fixed:"",breaks:{default:[],byDay:{}}});
   const [errors,setErrors]=useState({});
   const [deleteConfirm,setDeleteConfirm]=useState(null);
   const [saving,setSaving]=useState(false);
@@ -1092,13 +1350,13 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
     const errs=validate(form); setErrors(errs);
     if(Object.keys(errs).length>0) return;
     setSaving(true);
-    await addStaff(form.name.trim(),form.username.trim(),form.password,parseInt(form.wage),form.breaks);
-    setForm({name:"",username:"",password:"",wage:"",breaks:[]}); setShowAdd(false); setErrors({}); setSaving(false);
+    await addStaff(form.name.trim(),form.username.trim(),form.password,parseInt(form.wage),form.breaks,parseInt(form.transport_fixed)||0);
+    setForm({name:"",username:"",password:"",wage:"",transport_fixed:"",breaks:{default:[],byDay:{}}}); setShowAdd(false); setErrors({}); setSaving(false);
   }
 
   function openEdit(s){
     setEditId(s.id);
-    setForm({name:s.name,username:s.username,password:s.password,wage:String(s.wage||""),breaks:parseBreaks(s.breaks)});
+    setForm({name:s.name,username:s.username,password:s.password,wage:String(s.wage||""),transport_fixed:String(s.transport_fixed||""),breaks:parseBreakConfig(s.breaks)});
     setErrors({});
   }
 
@@ -1106,7 +1364,7 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
     const errs=validate(form,editId); setErrors(errs);
     if(Object.keys(errs).length>0) return;
     setSaving(true);
-    await updateStaff(editId,{name:form.name.trim(),username:form.username.trim(),password:form.password,wage:parseInt(form.wage),breaks:form.breaks});
+    await updateStaff(editId,{name:form.name.trim(),username:form.username.trim(),password:form.password,wage:parseInt(form.wage),transport_fixed:parseInt(form.transport_fixed)||0,breaks:form.breaks});
     setEditId(null); setErrors({}); setSaving(false);
   }
 
@@ -1135,14 +1393,15 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
             <div>{FField("username",t("col_uname"),t("f_unamePh"))}</div>
             <div>{FField("password",t("password"),t("f_pwPh"),"password")}</div>
             <div>{FField("wage",t("f_wageYen"),t("f_wageYen"),"number")}</div>
+            <div>{FField("transport_fixed",t("f_transport"),t("f_transportPh"),"number")}</div>
           </div>
           <div style={{marginTop:4,marginBottom:8,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
             <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.gold,display:"flex",alignItems:"center",gap:7}}><Icon name="coffee" size={15}/>{t("breakSetting")}</div>
-            <BreakEditor breaks={form.breaks} setBreaks={setBreaks} templates={templates} onPickTemplate={b=>setBreaks(b)}/>
+            <StaffBreakEditor config={form.breaks} setConfig={setBreaks} templates={templates}/>
           </div>
           <div style={{display:"flex",gap:10,marginTop:12}}>
             <button onClick={handleAdd} disabled={saving} style={{...PB(C.ink),flex:1}}><Icon name="check" size={15}/>{saving?t("acc_issuing"):t("acc_issue")}</button>
-            <button onClick={()=>{setShowAdd(false);setErrors({});setForm({name:"",username:"",password:"",wage:"",breaks:[]});}} style={{...PB("ghost"),flex:1}}>{t("cancel")}</button>
+            <button onClick={()=>{setShowAdd(false);setErrors({});setForm({name:"",username:"",password:"",wage:"",transport_fixed:"",breaks:{default:[],byDay:{}}});}} style={{...PB("ghost"),flex:1}}>{t("cancel")}</button>
           </div>
         </div>
       ):(
@@ -1163,7 +1422,11 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
                 <div style={{width:32,height:32,borderRadius:"50%",background:SUBTLE,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,flexShrink:0,fontFamily:SERIF}}>{nameToAvatar(s.name)}</div>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{s.name}</div>
-                  <div style={{fontSize:10,color:C.muted,marginTop:1}}>{t("breaksUnit",brkTotal)}</div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span>{t("breaksUnit",brkTotal)}</span>
+                    {hasPerDayBreaks(s.breaks)&&<span style={{padding:"1px 6px",borderRadius:10,background:isDarkTheme?"#241d0a":"#f4ecd6",color:C.gold,fontWeight:700}}>{t("be_varies")}</span>}
+                    {(Number(s.transport_fixed)||0)>0&&<span style={{display:"inline-flex",alignItems:"center",gap:3}}><Icon name="train" size={11}/>¥{(Number(s.transport_fixed)||0).toLocaleString()}</span>}
+                  </div>
                 </div>
               </div>
               <div style={{fontSize:12,fontVariantNumeric:"tabular-nums",color:C.muted}}>{s.username}</div>
@@ -1181,10 +1444,11 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
                   <div>{FField("username",t("col_uname"),t("col_uname"))}</div>
                   <div>{FField("password",t("password"),t("password"),"password")}</div>
                   <div>{FField("wage",t("f_wageYen"),t("f_wageYen"),"number")}</div>
+            <div>{FField("transport_fixed",t("f_transport"),t("f_transportPh"),"number")}</div>
                 </div>
                 <div style={{marginTop:4,marginBottom:8,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
                   <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.gold,display:"flex",alignItems:"center",gap:7}}><Icon name="coffee" size={15}/>{t("breakSetting")}</div>
-                  <BreakEditor breaks={form.breaks} setBreaks={setBreaks} templates={templates} onPickTemplate={b=>setBreaks(b)}/>
+                  <StaffBreakEditor config={form.breaks} setConfig={setBreaks} templates={templates}/>
                 </div>
                 <div style={{display:"flex",gap:10,marginTop:12}}>
                   <button onClick={handleUpdate} disabled={saving} style={{...PB(C.ink),flex:1}}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
@@ -1202,6 +1466,129 @@ function AccountsView({staff,addStaff,deleteStaff,updateStaff,templates}){
           <button onClick={async()=>{setSaving(true);await deleteStaff(deleteConfirm);setDeleteConfirm(null);setSaving(false);}} disabled={saving} style={{...PB("danger"),marginBottom:8}}><Icon name="trash" size={15}/>{saving?t("deleting"):t("delete")}</button>
         </Modal>
       )}
+    </div>
+  );
+}
+
+function StaffRequestView({currentUser,period,getRequest,saveRequest,deleteRequest,getShiftByDate,showToast}){
+  const {t}=useI18n();
+  const DAYS=t.arr("daysSun");
+  const [offset,setOffset]=useState(1); // default: the upcoming period
+  const [modal,setModal]=useState(null);
+  const [editVal,setEditVal]=useState({type:"work",start:"10:00",end:"18:00"});
+  const [saving,setSaving]=useState(false);
+  const dates=getPeriodDates(period,offset);
+  const sid=currentUser.id;
+  const periodLabel = period==="month"
+    ? t("ym",dates[0].getFullYear(),dates[0].getMonth())
+    : `${fmtDate(dates[0])} 〜 ${fmtDate(dates[dates.length-1])}`;
+  const notSet=dates.filter(d=>!getRequest(sid,d)&&!getShiftByDate(d,sid)).length;
+
+  function openModal(d){
+    const r=getRequest(sid,d);
+    setEditVal(r?{type:r.status,start:r.start_time||"10:00",end:r.end_time||"18:00"}:{type:"work",start:"10:00",end:"18:00"});
+    setModal({date:d});
+  }
+  async function save(){
+    setSaving(true);
+    await saveRequest(sid,modal.date,editVal.type,editVal.start,editVal.end);
+    setSaving(false); setModal(null); showToast(t("req_saved"));
+  }
+  async function clear(){
+    setSaving(true);
+    await deleteRequest(sid,modal.date);
+    setSaving(false); setModal(null); showToast(t("req_cleared"));
+  }
+
+  return (
+    <div>
+      <SectionTitle icon="calendar" title={t("req_title")} sub={t("req_sub")}/>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,background:C.paper,border:`1px solid ${C.border}`,borderRadius:12,padding:"8px 12px"}}>
+        <button onClick={()=>setOffset(o=>o-1)} style={NB}><Icon name="chevL" size={15}/></button>
+        <div style={{fontSize:13,fontWeight:700,fontVariantNumeric:"tabular-nums",textAlign:"center"}}>{periodLabel}{notSet>0&&<div style={{fontSize:10,color:C.accent,fontWeight:600,marginTop:1}}>{t("req_countLeft",notSet)}</div>}</div>
+        <button onClick={()=>setOffset(o=>o+1)} style={NB}><Icon name="chevR" size={15}/></button>
+      </div>
+      <div style={{background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:C.shadow,marginBottom:14}}>
+        {dates.map((d,i)=>{
+          const r=getRequest(sid,d), sh=getShiftByDate(d,sid);
+          const isWE=d.getDay()===0||d.getDay()===6, isToday=d.toDateString()===new Date().toDateString();
+          return (
+            <button key={i} onClick={()=>openModal(d)} style={{width:"100%",display:"grid",gridTemplateColumns:"56px 1fr auto",gap:10,alignItems:"center",padding:"11px 14px",border:"none",borderBottom:i<dates.length-1?`1px solid ${C.border2}`:"none",background:isToday?C.surface2:i%2===0?ROW_A:ROW_B,cursor:"pointer",textAlign:"left",fontFamily:SANS}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                <span style={{fontSize:14,fontWeight:700,color:isToday?C.gold:C.ink,fontVariantNumeric:"tabular-nums"}}>{d.getDate()}</span>
+                <span style={{fontSize:11,fontWeight:600,color:isWE?C.accent:C.muted}}>{DAYS[d.getDay()]}</span>
+              </div>
+              <div>
+                {r&&r.status==="work"&&<span style={{fontSize:12.5,fontWeight:700,color:C.gold,fontVariantNumeric:"tabular-nums"}}>{t("req_work")}: {r.start_time}〜{r.end_time}</span>}
+                {r&&r.status==="off"&&<span style={{fontSize:12.5,fontWeight:700,color:C.accent}}>{t("req_off")}</span>}
+                {!r&&<span style={{fontSize:12,color:FAINT}}>{t("req_none")}</span>}
+                {sh&&<div style={{fontSize:10.5,color:C.green,fontWeight:700,marginTop:2,display:"inline-flex",alignItems:"center",gap:4}}><Icon name="check" size={11}/>{t("req_done")}: {sh.start_time}〜{sh.end_time}</div>}
+              </div>
+              <Icon name={r?"pencil":"plus"} size={15} style={{color:C.muted}}/>
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={()=>showToast(t("req_submitted"))} style={{...PB(C.gold),marginBottom:8}}><Icon name="check" size={16}/>{t("req_submit")}</button>
+      <div style={{fontSize:11,color:C.muted,textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="signal" size={12}/>{t("req_note")}</div>
+
+      {modal&&(
+        <Modal onClose={()=>setModal(null)}>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:3,fontFamily:SERIF}}>{t("req_setTitle")}</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:16}}>{t("md",modal.date.getMonth(),modal.date.getDate())}（{DAYS[modal.date.getDay()]}）</div>
+          <div style={{display:"flex",gap:8,marginBottom:16}}>
+            {[["work",t("req_typeWork"),"check"],["off",t("req_typeOff"),"coffee"]].map(([v,label,ic])=>{
+              const on=editVal.type===v;
+              return <button key={v} onClick={()=>setEditVal(p=>({...p,type:v}))} style={{flex:1,padding:"11px 8px",borderRadius:10,border:`2px solid ${on?C.gold:C.border}`,background:on?C.gold:"transparent",color:on?ON_GOLD:C.muted,fontFamily:SANS,fontSize:13,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7}}><Icon name={ic} size={15}/>{label}</button>;
+            })}
+          </div>
+          {editVal.type==="work"&&(
+            <div style={{display:"flex",gap:12,marginBottom:20}}>
+              <label style={LS}>{t("inTime")}<select value={editVal.start} onChange={e=>setEditVal(v=>({...v,start:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
+              <label style={LS}>{t("outTime")}<select value={editVal.end} onChange={e=>setEditVal(v=>({...v,end:e.target.value}))} style={SS}>{TIME_SLOTS.map(x=><option key={x}>{x}</option>)}</select></label>
+            </div>
+          )}
+          <button onClick={save} disabled={saving} style={PB(C.ink)}><Icon name="save" size={15}/>{saving?t("saving"):t("save")}</button>
+          {getRequest(sid,modal.date)&&<button onClick={clear} disabled={saving} style={{...PB("danger"),marginTop:8}}><Icon name="trash" size={15}/>{t("req_clear")}</button>}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function SettingsView({settings,setSettings,showToast}){
+  const {t}=useI18n();
+  const shiftP=settings.shiftPeriod||"week";
+  const reqP=settings.requestPeriod||"week";
+  function set(key,p){ setSettings(s=>({...s,[key]:p})); showToast(t("set_saved")); }
+  const card={background:C.paper,border:`1px solid ${C.border}`,borderRadius:14,padding:18,boxShadow:C.shadow,marginBottom:14};
+  function Seg({value,onPick,opts}){
+    return (
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {opts.map(([v,label])=>{
+          const on=value===v;
+          return (
+            <button key={v} onClick={()=>onPick(v)} style={{flex:"1 1 90px",padding:"13px 8px",borderRadius:12,border:`2px solid ${on?C.gold:C.border}`,background:on?C.gold:"transparent",color:on?ON_GOLD:C.muted,fontFamily:SANS,fontSize:13.5,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,whiteSpace:"nowrap"}}>
+              {on&&<Icon name="check" size={15}/>}{label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <SectionTitle icon="settings" title={t("set_title")} sub={t("set_sub")}/>
+      <div style={card}>
+        <div style={{fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8,fontFamily:SERIF}}><Icon name="calendar" size={16} style={{color:C.gold}}/>{t("set_shiftPeriod")}</div>
+        <div style={{fontSize:11.5,color:C.muted,marginTop:4,marginBottom:14}}>{t("set_shiftPeriodSub")}</div>
+        <Seg value={shiftP} onPick={p=>set("shiftPeriod",p)} opts={[["week",t("set_week")],["month",t("set_month")]]}/>
+      </div>
+      <div style={card}>
+        <div style={{fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8,fontFamily:SERIF}}><Icon name="pencil" size={15} style={{color:C.gold}}/>{t("set_reqPeriod")}</div>
+        <div style={{fontSize:11.5,color:C.muted,marginTop:4,marginBottom:14}}>{t("set_reqPeriodSub")}</div>
+        <Seg value={reqP} onPick={p=>set("requestPeriod",p)} opts={[["week",t("req_week")],["2week",t("req_2week")],["month",t("req_month")]]}/>
+      </div>
     </div>
   );
 }
